@@ -252,6 +252,42 @@ export async function seed(): Promise<void> {
     insertBookingSeat.run(uuidv4(), aliceBookingId, s.id, 40.0);
   }
 
+  // Pre-seed ticket confirmation email into email_logs for In-App Email Sandbox & Gate QR Scanner
+  const aliceQrDataUrl = await QrService.generateDataUrl({
+    bookingReference: aliceBookingRef,
+    signature: aliceQrSig,
+  });
+
+  const aliceEmailData = {
+    bookingId: aliceBookingId,
+    bookingReference: aliceBookingRef,
+    signature: aliceQrSig,
+    eventTitle: 'Interstellar (10th Anniversary Sold-Out Gala)',
+    venueName: 'Starlight IMAX Cinema',
+    venueLocation: '450 West 42nd St, New York',
+    dateTime: new Date(inTwoDays).toLocaleString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    seats: 'A1 (VIP), A2 (VIP)',
+    totalAmount: 80.0,
+    qrCode: aliceQrDataUrl,
+  };
+
+  db.prepare(`
+    INSERT INTO email_logs (id, to_email, subject, template, data_json, status, sent_at)
+    VALUES (?, ?, ?, 'TICKET_CONFIRMATION', ?, 'SENT', CURRENT_TIMESTAMP)
+  `).run(
+    uuidv4(),
+    'alice@cineconcert.io',
+    `Your Tickets for Interstellar (10th Anniversary Sold-Out Gala) [${aliceBookingRef}]`,
+    JSON.stringify(aliceEmailData)
+  );
+
   // 8. Place Bob on Waitlist for Interstellar Gala (VIP Category, 2 seats)
   const bobWaitlistId = uuidv4();
   db.prepare(`

@@ -52,20 +52,41 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose 
     try {
       const res = await fetch('/api/sandbox/emails');
       const data = await res.json();
-      const ticketEmail = data.emails?.find((e: any) => e.template === 'TICKET_CONFIRMATION');
+      const ticketEmail = data.emails?.find((e: any) => e.template === 'TICKET_CONFIRMATION' && e.data?.bookingReference);
       if (ticketEmail?.data?.bookingReference) {
-        setBookingRef(ticketEmail.data.bookingReference);
-        // Look up signature from booking
-        const lookup = await fetch(`/api/bookings/verify/${ticketEmail.data.bookingReference}`);
-        const lookupData = await lookup.json();
-        if (lookupData.signature) {
-          setSignature(lookupData.signature);
-          setPayloadInput(JSON.stringify({ bookingReference: ticketEmail.data.bookingReference, signature: lookupData.signature }, null, 2));
+        const ref = ticketEmail.data.bookingReference;
+        let sig = ticketEmail.data.signature;
+        if (!sig) {
+          const lookup = await fetch(`/api/bookings/verify/${encodeURIComponent(ref)}`);
+          const lookupData = await lookup.json();
+          sig = lookupData.signature;
         }
-      } else {
-        // Fallback default
-        setBookingRef('BK-ALICE-DEMO');
-        setSignature('dummy_signature_sample');
+        if (sig) {
+          setBookingRef(ref);
+          setSignature(sig);
+          setPayloadInput(JSON.stringify({ bookingReference: ref, signature: sig }, null, 2));
+          setError(null);
+          return;
+        }
+      }
+
+      // Check user's bookings if logged in
+      const authToken = localStorage.getItem('cc_token');
+      if (authToken) {
+        const bookingsRes = await fetch('/api/bookings/my-bookings', {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (bookingsRes.ok) {
+          const bData = await bookingsRes.json();
+          if (bData.bookings && bData.bookings.length > 0) {
+            const b = bData.bookings[0];
+            setBookingRef(b.bookingReference);
+            setSignature(b.signature);
+            setPayloadInput(JSON.stringify({ bookingReference: b.bookingReference, signature: b.signature }, null, 2));
+            setError(null);
+            return;
+          }
+        }
       }
     } catch {
       // Ignored

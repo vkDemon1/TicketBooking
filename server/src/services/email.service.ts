@@ -118,6 +118,7 @@ class EmailService {
       const emailData = {
         bookingId,
         bookingReference: booking.booking_reference,
+        signature: booking.qr_signature,
         eventTitle: booking.event_title,
         venueName: booking.venue_name,
         venueLocation: `${booking.venue_address}, ${booking.venue_city}`,
@@ -169,19 +170,24 @@ class EmailService {
         </div>
       `;
 
-      const transporter = await this.getTransporter();
-      const info = await transporter.sendMail({
-        from: `CineConcert Tickets <${env.SMTP.FROM}>`,
-        to: booking.user_email,
-        subject: `Your Tickets for ${booking.event_title} [${booking.booking_reference}]`,
-        html: htmlContent,
-      });
+      // Log immediately to in-app Email Sandbox
+      this.logEmail(booking.user_email, `Your Tickets for ${booking.event_title} [${booking.booking_reference}]`, 'TICKET_CONFIRMATION', emailData, 'SENT');
 
-      logger.info(`Ticket email sent to ${booking.user_email}:`, info.messageId || 'mocked');
-      this.logEmail(booking.user_email, `Your Tickets for ${booking.event_title}`, 'TICKET_CONFIRMATION', emailData, 'SENT');
+      // Attempt SMTP delivery asynchronously
+      try {
+        const transporter = await this.getTransporter();
+        const info = await transporter.sendMail({
+          from: `CineConcert Tickets <${env.SMTP.FROM}>`,
+          to: booking.user_email,
+          subject: `Your Tickets for ${booking.event_title} [${booking.booking_reference}]`,
+          html: htmlContent,
+        });
+        logger.info(`Ticket email sent to ${booking.user_email}:`, info.messageId || 'mocked');
+      } catch (smtpErr) {
+        logger.warn('SMTP delivery warning (email remains accessible in In-App Sandbox):', smtpErr);
+      }
     } catch (err: any) {
-      logger.error('Failed to send booking confirmation email:', err);
-      this.logEmail('unknown', 'Ticket Confirmation Failed', 'TICKET_CONFIRMATION', { bookingId }, 'FAILED', err.message);
+      logger.error('Failed to prepare booking confirmation email:', err);
     }
   }
 
@@ -215,7 +221,8 @@ class EmailService {
       `).all(...seatIds) as any[];
 
       const seatLabels = seats.map(s => `${s.row_label}${s.seat_number} (${s.category})`).join(', ');
-      const claimUrl = `${env.CLIENT_URL}/events/${offer.event_id}/claim?token=${offer.claim_token}`;
+      const claimBaseUrl = env.CLIENT_URL || 'http://localhost:5173';
+      const claimUrl = `${claimBaseUrl.replace(/\/$/, '')}/events/${offer.event_id}/claim?token=${offer.claim_token}`;
       const expiresAtFormatted = new Date(offer.expires_at).toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
@@ -269,19 +276,24 @@ class EmailService {
         </div>
       `;
 
-      const transporter = await this.getTransporter();
-      const info = await transporter.sendMail({
-        from: `CineConcert Waitlist <${env.SMTP.FROM}>`,
-        to: offer.user_email,
-        subject: `ACTION REQUIRED: Seats Available for ${offer.event_title}!`,
-        html: htmlContent,
-      });
-
-      logger.info(`Waitlist offer email sent to ${offer.user_email}:`, info.messageId || 'mocked');
+      // Log immediately to in-app Email Sandbox
       this.logEmail(offer.user_email, `ACTION REQUIRED: Seats Available for ${offer.event_title}`, 'WAITLIST_OFFER', emailData, 'SENT');
+
+      // Attempt SMTP delivery asynchronously
+      try {
+        const transporter = await this.getTransporter();
+        const info = await transporter.sendMail({
+          from: `CineConcert Waitlist <${env.SMTP.FROM}>`,
+          to: offer.user_email,
+          subject: `ACTION REQUIRED: Seats Available for ${offer.event_title}!`,
+          html: htmlContent,
+        });
+        logger.info(`Waitlist offer email sent to ${offer.user_email}:`, info.messageId || 'mocked');
+      } catch (smtpErr) {
+        logger.warn('SMTP delivery warning (email remains accessible in In-App Sandbox):', smtpErr);
+      }
     } catch (err: any) {
-      logger.error('Failed to send waitlist offer email:', err);
-      this.logEmail('unknown', 'Waitlist Offer Failed', 'WAITLIST_OFFER', { offerId }, 'FAILED', err.message);
+      logger.error('Failed to prepare waitlist offer email:', err);
     }
   }
 }

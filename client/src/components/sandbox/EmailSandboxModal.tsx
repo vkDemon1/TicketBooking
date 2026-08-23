@@ -36,7 +36,20 @@ export const EmailSandboxModal: React.FC<EmailSandboxModalProps> = ({ isOpen, on
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  const getResolvedClaimUrl = (rawUrl?: string) => {
+    if (!rawUrl) return '';
+    if (rawUrl.startsWith('http://localhost') || rawUrl.startsWith('http://127.0.0.1')) {
+      try {
+        const parsed = new URL(rawUrl);
+        return `${window.location.origin}${parsed.pathname}${parsed.search}`;
+      } catch {
+        return rawUrl;
+      }
+    }
+    return rawUrl;
+  };
+
+  const resolvedClaimUrl = selectedEmail?.data?.claimUrl ? getResolvedClaimUrl(selectedEmail.data.claimUrl) : '';
 
   return (
     <div style={{
@@ -195,7 +208,7 @@ export const EmailSandboxModal: React.FC<EmailSandboxModalProps> = ({ isOpen, on
                 </div>
 
                 {/* If Waitlist Offer: Show Quick Magic Claim Link Action */}
-                {selectedEmail.template === 'WAITLIST_OFFER' && selectedEmail.data?.claimUrl && (
+                {selectedEmail.template === 'WAITLIST_OFFER' && resolvedClaimUrl && (
                   <div style={{
                     background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)',
                     border: '1px solid rgba(56, 189, 248, 0.4)',
@@ -215,7 +228,7 @@ export const EmailSandboxModal: React.FC<EmailSandboxModalProps> = ({ isOpen, on
                       </div>
                     </div>
                     <a
-                      href={selectedEmail.data.claimUrl}
+                      href={resolvedClaimUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-primary btn-sm"
