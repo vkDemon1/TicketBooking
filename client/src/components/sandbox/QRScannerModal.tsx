@@ -1,18 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QrCode, CheckCircle2, XCircle, AlertTriangle, X, ShieldCheck, Search } from 'lucide-react';
 
 interface QRScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialBookingReference?: string;
+  initialSignature?: string;
 }
 
-export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose }) => {
+export const QRScannerModal: React.FC<QRScannerModalProps> = ({
+  isOpen,
+  onClose,
+  initialBookingReference,
+  initialSignature,
+}) => {
   const [payloadInput, setPayloadInput] = useState('');
   const [bookingRef, setBookingRef] = useState('');
   const [signature, setSignature] = useState('');
   const [verificationResult, setVerificationResult] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync initial props when opened with specific booking
+  useEffect(() => {
+    if (isOpen) {
+      if (initialBookingReference && initialSignature) {
+        setBookingRef(initialBookingReference);
+        setSignature(initialSignature);
+        setPayloadInput(JSON.stringify({ bookingReference: initialBookingReference, signature: initialSignature }, null, 2));
+        setError(null);
+        setVerificationResult(null);
+      }
+    }
+  }, [isOpen, initialBookingReference, initialSignature]);
 
   if (!isOpen) return null;
 
@@ -93,41 +113,77 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose 
     }
   };
 
+  // Handle Escape key press to close modal
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(0, 0, 0, 0.8)',
-      backdropFilter: 'blur(10px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 9999,
-      padding: 20,
-    }}>
-      <div className="glass-panel" style={{
-        maxWidth: 680,
-        width: '100%',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        background: '#0d1322',
-        border: '1px solid rgba(16, 185, 129, 0.3)',
-        padding: 28,
-        position: 'relative',
-      }}>
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.8)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: 20,
+        cursor: 'pointer',
+      }}
+    >
+      <div
+        className="glass-panel"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: 680,
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          background: '#0d1322',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          padding: 28,
+          position: 'relative',
+          cursor: 'default',
+        }}
+      >
         <button
-          onClick={onClose}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
           style={{
             position: 'absolute',
             top: 20,
             right: 20,
-            background: 'none',
-            border: 'none',
-            color: '#94a3b8',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: 8,
+            color: '#cbd5e1',
             cursor: 'pointer',
+            padding: '6px 8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.15s ease',
           }}
+          aria-label="Close QR Scanner modal"
+          title="Close (Esc)"
         >
-          <X size={22} />
+          <X size={20} />
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>

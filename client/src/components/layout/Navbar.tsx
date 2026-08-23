@@ -185,6 +185,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {/* Email Sandbox Button */}
             <button
+              type="button"
               onClick={() => setIsEmailOpen(true)}
               className="btn btn-secondary btn-sm"
               title="Open In-App Email Sandbox to inspect sent tickets & magic claim links"
@@ -196,6 +197,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
 
             {/* QR Scanner Button */}
             <button
+              type="button"
               onClick={() => setIsScannerOpen(true)}
               className="btn btn-secondary btn-sm"
               title="Open QR Ticket Scanner to verify admission"
@@ -228,6 +230,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
                 </div>
 
                 <button
+                  type="button"
                   onClick={logout}
                   className="btn btn-secondary btn-sm"
                   title="Log out"
@@ -238,6 +241,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
               </div>
             ) : (
               <button
+                type="button"
                 onClick={() => setIsAuthOpen(true)}
                 className="btn btn-primary btn-sm"
               >
@@ -247,6 +251,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
 
             {/* Mobile Menu Button */}
             <button
+              type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="btn btn-secondary btn-sm mobile-menu-toggle"
               style={{ padding: '6px 10px', display: 'none' }}
@@ -268,6 +273,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
             gap: 8,
           }}>
             <button
+              type="button"
               onClick={() => handleNavClick('/')}
               className={`btn ${currentPath === '/' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
               style={{ justifyContent: 'flex-start' }}
@@ -278,6 +284,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
 
             {user && (
               <button
+                type="button"
                 onClick={() => handleNavClick('/my-bookings')}
                 className={`btn ${currentPath === '/my-bookings' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
                 style={{ justifyContent: 'flex-start' }}
@@ -289,6 +296,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
 
             {user && (user.role === 'ORGANIZER' || user.role === 'ADMIN') && (
               <button
+                type="button"
                 onClick={() => handleNavClick('/organizer')}
                 className={`btn ${currentPath === '/organizer' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
                 style={{ justifyContent: 'flex-start' }}
@@ -300,6 +308,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
 
             {user && user.role === 'ADMIN' && (
               <button
+                type="button"
                 onClick={() => handleNavClick('/admin')}
                 className={`btn ${currentPath === '/admin' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
                 style={{ justifyContent: 'flex-start' }}
@@ -308,6 +317,33 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
                 Admin Venues
               </button>
             )}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 4, paddingTop: 8, borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEmailOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="btn btn-secondary btn-sm"
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                <Mail size={15} color="#38bdf8" />
+                Mail Sandbox
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsScannerOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="btn btn-secondary btn-sm"
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                <QrCode size={15} color="#10b981" />
+                QR Scanner
+              </button>
+            </div>
           </div>
         )}
       </nav>

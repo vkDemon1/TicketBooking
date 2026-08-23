@@ -34,8 +34,11 @@ const AppContent: React.FC = () => {
       const parts = path.split('/');
       setSelectedEventId(parts[2]);
       setCurrentPath('/event-details');
+    } else if (path === '/my-bookings' || path === '/organizer' || path === '/admin') {
+      setCurrentPath(path);
     } else {
-      setCurrentPath(path || '/');
+      // Normalizes /qr-scanner, /scanner, /sandbox, /404, etc. to home view
+      setCurrentPath('/');
     }
   };
 
@@ -69,6 +72,13 @@ const AppContent: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
+  const isKnownRoute =
+    (currentPath === '/event-details' && selectedEventId) ||
+    (currentPath === '/claim' && selectedEventId && claimToken) ||
+    currentPath === '/my-bookings' ||
+    currentPath === '/organizer' ||
+    currentPath === '/admin';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {/* Demo Persona Switcher Banner */}
@@ -79,10 +89,6 @@ const AppContent: React.FC = () => {
 
       {/* Main Page View */}
       <main style={{ flex: 1 }}>
-        {currentPath === '/' && (
-          <HomePage onSelectEvent={(id) => navigateTo('/event-details', id)} />
-        )}
-
         {currentPath === '/event-details' && selectedEventId && (
           <EventDetailsPage
             eventId={selectedEventId}
@@ -113,6 +119,10 @@ const AppContent: React.FC = () => {
 
         {currentPath === '/admin' && (
           <AdminVenuesPage />
+        )}
+
+        {!isKnownRoute && (
+          <HomePage onSelectEvent={(id) => navigateTo('/event-details', id)} />
         )}
       </main>
 

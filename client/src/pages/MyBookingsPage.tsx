@@ -276,6 +276,8 @@ export const MyBookingsPage: React.FC<MyBookingsPageProps> = ({
         <QRScannerModal
           isOpen={Boolean(selectedVerifyBooking)}
           onClose={() => setSelectedVerifyBooking(null)}
+          initialBookingReference={selectedVerifyBooking.bookingReference}
+          initialSignature={selectedVerifyBooking.signature}
         />
       )}
     </div>

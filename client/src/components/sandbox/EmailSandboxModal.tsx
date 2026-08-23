@@ -36,6 +36,18 @@ export const EmailSandboxModal: React.FC<EmailSandboxModalProps> = ({ isOpen, on
     }
   }, [isOpen]);
 
+  // Handle Escape key press to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   const getResolvedClaimUrl = (rawUrl?: string) => {
     if (!rawUrl) return '';
     if (rawUrl.startsWith('http://localhost') || rawUrl.startsWith('http://127.0.0.1')) {
@@ -51,28 +63,40 @@ export const EmailSandboxModal: React.FC<EmailSandboxModalProps> = ({ isOpen, on
 
   const resolvedClaimUrl = selectedEmail?.data?.claimUrl ? getResolvedClaimUrl(selectedEmail.data.claimUrl) : '';
 
+  if (!isOpen) return null;
+
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(0, 0, 0, 0.8)',
-      backdropFilter: 'blur(10px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 9999,
-      padding: 20,
-    }}>
-      <div className="glass-panel" style={{
-        maxWidth: 1000,
-        width: '100%',
-        height: '85vh',
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.8)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
         display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        background: '#0c101c',
-        border: '1px solid rgba(99, 102, 241, 0.3)',
-      }}>
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: 20,
+        cursor: 'pointer',
+      }}
+    >
+      <div
+        className="glass-panel"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: 1000,
+          width: '100%',
+          height: '85vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          background: '#0c101c',
+          border: '1px solid rgba(99, 102, 241, 0.3)',
+          cursor: 'default',
+        }}
+      >
         {/* Header */}
         <div style={{
           padding: '16px 24px',
@@ -104,6 +128,7 @@ export const EmailSandboxModal: React.FC<EmailSandboxModalProps> = ({ isOpen, on
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button
+              type="button"
               onClick={fetchEmails}
               disabled={loading}
               className="btn btn-secondary btn-sm"
@@ -112,16 +137,30 @@ export const EmailSandboxModal: React.FC<EmailSandboxModalProps> = ({ isOpen, on
               Refresh
             </button>
             <button
-              onClick={onClose}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#94a3b8',
-                cursor: 'pointer',
-                padding: 6,
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
               }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: '8px',
+                color: '#cbd5e1',
+                cursor: 'pointer',
+                padding: '6px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                transition: 'all 0.15s ease',
+              }}
+              aria-label="Close Email Sandbox modal"
+              title="Close (Esc)"
             >
-              <X size={22} />
+              <X size={18} />
+              <span>Close</span>
             </button>
           </div>
         </div>
