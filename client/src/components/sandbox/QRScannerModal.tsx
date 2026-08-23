@@ -36,8 +36,6 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     }
   }, [isOpen, initialBookingReference, initialSignature]);
 
-  if (!isOpen) return null;
-
   const handleJsonPayloadParse = () => {
     try {
       const parsed = JSON.parse(payloadInput.trim());
