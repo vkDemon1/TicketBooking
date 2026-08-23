@@ -11,12 +11,20 @@ import { MyBookingsPage } from './pages/MyBookingsPage';
 import { ClaimOfferPage } from './pages/ClaimOfferPage';
 import { AdminVenuesPage } from './pages/AdminVenuesPage';
 import { OrganizerDashboardPage } from './pages/OrganizerDashboardPage';
+import { AuthModal } from './components/common/AuthModal';
+import { EmailSandboxModal } from './components/sandbox/EmailSandboxModal';
+import { QRScannerModal } from './components/sandbox/QRScannerModal';
 
 const AppContent: React.FC = () => {
   const { user } = useAuth();
   const [currentPath, setCurrentPath] = useState<string>(() => window.location.pathname);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [claimToken, setClaimToken] = useState<string | null>(null);
+
+  // Global Modals State (Mounted at Root Level to avoid any parent stacking context clipping)
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isEmailOpen, setIsEmailOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Sync with browser navigation & URL params
   const parseCurrentUrl = () => {
@@ -85,7 +93,13 @@ const AppContent: React.FC = () => {
       <DemoSwitcher />
 
       {/* Main Navbar */}
-      <Navbar currentPath={currentPath} onNavigate={(p) => navigateTo(p)} />
+      <Navbar
+        currentPath={currentPath}
+        onNavigate={(p) => navigateTo(p)}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenEmail={() => setIsEmailOpen(true)}
+        onOpenScanner={() => setIsScannerOpen(true)}
+      />
 
       {/* Main Page View */}
       <main style={{ flex: 1 }}>
@@ -125,6 +139,11 @@ const AppContent: React.FC = () => {
           <HomePage onSelectEvent={(id) => navigateTo('/event-details', id)} />
         )}
       </main>
+
+      {/* Root Application Modals */}
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+      <EmailSandboxModal isOpen={isEmailOpen} onClose={() => setIsEmailOpen(false)} />
+      <QRScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} />
 
       {/* Footer */}
       <Footer />

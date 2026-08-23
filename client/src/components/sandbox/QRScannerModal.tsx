@@ -21,7 +21,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync initial props when opened with specific booking
+  // Sync initial props when opened or auto-load recent demo ticket
   useEffect(() => {
     if (isOpen) {
       if (initialBookingReference && initialSignature) {
@@ -30,6 +30,8 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         setPayloadInput(JSON.stringify({ bookingReference: initialBookingReference, signature: initialSignature }, null, 2));
         setError(null);
         setVerificationResult(null);
+      } else if (!bookingRef) {
+        loadDemoAliceTicket();
       }
     }
   }, [isOpen, initialBookingReference, initialSignature]);
@@ -114,7 +116,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   };
 
   // Handle Escape key press to close modal
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {

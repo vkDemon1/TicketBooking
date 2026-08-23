@@ -21,14 +21,38 @@ import {
 interface NavbarProps {
   currentPath: string;
   onNavigate: (path: string) => void;
+  onOpenAuth?: () => void;
+  onOpenEmail?: () => void;
+  onOpenScanner?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  currentPath,
+  onNavigate,
+  onOpenAuth,
+  onOpenEmail,
+  onOpenScanner,
+}) => {
   const { user, logout } = useAuth();
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [isEmailOpen, setIsEmailOpen] = useState(false);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [localAuthOpen, setLocalAuthOpen] = useState(false);
+  const [localEmailOpen, setLocalEmailOpen] = useState(false);
+  const [localScannerOpen, setLocalScannerOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const handleOpenAuth = () => {
+    if (onOpenAuth) onOpenAuth();
+    else setLocalAuthOpen(true);
+  };
+
+  const handleOpenEmail = () => {
+    if (onOpenEmail) onOpenEmail();
+    else setLocalEmailOpen(true);
+  };
+
+  const handleOpenScanner = () => {
+    if (onOpenScanner) onOpenScanner();
+    else setLocalScannerOpen(true);
+  };
 
   const handleNavClick = (path: string) => {
     onNavigate(path);
@@ -186,7 +210,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
             {/* Email Sandbox Button */}
             <button
               type="button"
-              onClick={() => setIsEmailOpen(true)}
+              onClick={handleOpenEmail}
               className="btn btn-secondary btn-sm"
               title="Open In-App Email Sandbox to inspect sent tickets & magic claim links"
               style={{ padding: '6px 12px' }}
@@ -198,7 +222,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
             {/* QR Scanner Button */}
             <button
               type="button"
-              onClick={() => setIsScannerOpen(true)}
+              onClick={handleOpenScanner}
               className="btn btn-secondary btn-sm"
               title="Open QR Ticket Scanner to verify admission"
               style={{ padding: '6px 12px' }}
@@ -242,7 +266,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
             ) : (
               <button
                 type="button"
-                onClick={() => setIsAuthOpen(true)}
+                onClick={handleOpenAuth}
                 className="btn btn-primary btn-sm"
               >
                 Sign In
@@ -322,7 +346,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
               <button
                 type="button"
                 onClick={() => {
-                  setIsEmailOpen(true);
+                  handleOpenEmail();
                   setIsMobileMenuOpen(false);
                 }}
                 className="btn btn-secondary btn-sm"
@@ -334,7 +358,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
               <button
                 type="button"
                 onClick={() => {
-                  setIsScannerOpen(true);
+                  handleOpenScanner();
                   setIsMobileMenuOpen(false);
                 }}
                 className="btn btn-secondary btn-sm"
@@ -348,10 +372,10 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPath, onNavigate }) => {
         )}
       </nav>
 
-      {/* Interactive Modals */}
-      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
-      <EmailSandboxModal isOpen={isEmailOpen} onClose={() => setIsEmailOpen(false)} />
-      <QRScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} />
+      {/* Local Fallback Modals (if not handled by parent App) */}
+      {!onOpenAuth && <AuthModal isOpen={localAuthOpen} onClose={() => setLocalAuthOpen(false)} />}
+      {!onOpenEmail && <EmailSandboxModal isOpen={localEmailOpen} onClose={() => setLocalEmailOpen(false)} />}
+      {!onOpenScanner && <QRScannerModal isOpen={localScannerOpen} onClose={() => setLocalScannerOpen(false)} />}
     </>
   );
 };
