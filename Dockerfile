@@ -28,7 +28,7 @@ COPY server/package*.json ./
 RUN npm install --omit=dev
 
 COPY --from=server-builder /app/server/dist ./dist
-COPY --from=server-builder /app/server/src/db/schema.sql ./src/db/schema.sql
+COPY --from=server-builder /app/server/src/db/schema.sql ./dist/db/schema.sql
 COPY --from=client-builder /app/client/dist /app/client/dist
 
 # Create persistent data directory for SQLite
