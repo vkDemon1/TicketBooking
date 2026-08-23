@@ -6,8 +6,8 @@
 
 ## 🌐 Live Demo & Source Code
 
-- **LIVE DEMO**: [Render URL will be added after deployment]
-- **SOURCE CODE**: [GitHub repository URL will be added after repository creation]
+- **LIVE DEMO**: https://cineconcert.onrender.com
+- **SOURCE CODE**: https://github.com/vkDemon1/TicketBooking
 
 ---
 
