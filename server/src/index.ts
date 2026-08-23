@@ -6,6 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { env } from './config/env.js';
 import { initDatabase } from './config/db.js';
+import { ensureDemoData } from './db/ensure-demo-data.js';
 import { socketService } from './services/socket.service.js';
 import { holdSweeperService } from './services/hold-sweeper.service.js';
 import { waitlistService } from './services/waitlist.service.js';
@@ -32,6 +33,9 @@ app.use(express.json());
 // Initialize Database Schema and SQLite Settings
 initDatabase();
 logger.info('Database schema and SQLite WAL mode initialized.');
+
+// Ensure demo data if database is empty
+await ensureDemoData();
 
 // Initialize Socket.io Real-time server
 socketService.init(server);

@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { db, initDatabase } from '../config/db.js';
 import { QrService } from '../services/qr.service.js';
 import { logger } from '../utils/logger.js';
@@ -269,8 +271,9 @@ export async function seed(): Promise<void> {
   logger.info('🎉 Seed completed successfully!');
 }
 
-// If run directly via tsx/node
-if (process.argv[1]?.endsWith('seed.ts')) {
+// If run directly via CLI (npm run seed)
+const __filename = fileURLToPath(import.meta.url);
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
   seed()
     .then(() => process.exit(0))
     .catch(err => {
