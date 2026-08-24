@@ -119,10 +119,10 @@ flowchart TD
 ## 5. Live Demo & Repository Links
 
 - **LIVE DEMO**:
-  `[Render URL will be added after deployment]`
+  https://cineconcert.onrender.com
 
 - **SOURCE CODE**:
-  `[GitHub repository URL will be added after repository creation]`
+  https://github.com/vkDemon1/TicketBooking
 
 ---
 
@@ -222,7 +222,7 @@ TicketBooking/
 
 ### 1. Clone & Install Dependencies
 ```bash
-git clone https://github.com/YourRepo/TicketBooking.git
+git clone https://github.com/vkDemon1/TicketBooking.git
 cd TicketBooking
 
 # Install root, server, and client dependencies
@@ -476,20 +476,27 @@ npm run test:qr
 
 ## 22. Production Deployment & Persistent Storage
 
-### Docker Deployment
+### Live Render Deployment
+- **Deployment Type**: CineConcert is deployed as a Docker Web Service on Render.
+- **Live URL**: https://cineconcert.onrender.com
+- **Database Engine**: The application uses SQLite (`/app/server/data/ticket_booking.db` inside the container).
+- **Free Instance Notice**: The current hosted demonstration runs on Render's Free instance without an attached persistent disk. In a production environment, a persistent disk/volume would be required for persistent SQLite storage across container restarts and redeployments.
+
+### Local Docker Deployment
 ```bash
 # Build and run with persistent volume mount for SQLite:
 docker-compose up --build -d
 ```
 The application will be live at `http://localhost:5000`.
 
-### Cloud Hosting Persistence Strategy (Render / Railway / Fly.io)
-1. **Render**:
-   - Create a **Web Service** using Docker or Node runtime.
+### Production Cloud Hosting Persistence Strategy (Render / Railway / Fly.io)
+For a persistent production deployment requiring SQLite data retention across restarts:
+1. **Render (Production)**:
+   - Deploy as a **Web Service** using Docker runtime.
    - Attach a **Persistent Disk** mounted at `/app/server/data` (Size: 1GB+).
    - Set environment variables: `PORT=5000`, `NODE_ENV=production`, `JWT_SECRET=...`, `QR_SECRET=...`, `DB_PATH=/app/server/data/ticket_booking.db`.
-2. **Railway / Fly.io**:
-   - Configure a volume mounted to `/app/server/data` to ensure SQLite survives restarts and container redeployments.
+2. **Railway / Fly.io (Production)**:
+   - Configure a persistent volume mounted to `/app/server/data` to ensure SQLite survives container restarts and redeployments.
 
 ---
 
