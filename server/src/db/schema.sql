@@ -151,3 +151,4 @@ CREATE INDEX IF NOT EXISTS idx_waitlist_queue ON waitlist_entries(event_id, seat
 CREATE INDEX IF NOT EXISTS idx_waitlist_offers_active ON waitlist_offers(status, expires_at);
 CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(event_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_ref ON bookings(booking_reference);
+CREATE INDEX IF NOT EXISTS idx_bookings_redeemed ON bookings(event_id, is_redeemed);

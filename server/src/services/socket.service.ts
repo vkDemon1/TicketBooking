@@ -64,10 +64,26 @@ class SocketService {
    */
   public broadcastSeatUpdate(
     eventId: string,
-    eventType: 'SEATS_HELD' | 'SEATS_RELEASED' | 'SEATS_BOOKED' | 'WAITLIST_OFFER_CREATED' | 'WAITLIST_OFFER_EXPIRED',
+    eventType: 'SEATS_HELD' | 'SEATS_RELEASED' | 'SEATS_BOOKED' | 'WAITLIST_OFFER_CREATED' | 'WAITLIST_OFFER_EXPIRED' | 'TICKET_REDEEMED',
     payload: any
   ): void {
     this.emitToRoom(`event:${eventId}`, eventType, {
+      eventId,
+      ...payload,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Broadcast gate check-in activity
+   */
+  public broadcastGateActivity(eventId: string, payload: any): void {
+    this.emitToRoom(`event:${eventId}`, 'TICKET_REDEEMED', {
+      eventId,
+      ...payload,
+      timestamp: new Date().toISOString(),
+    });
+    this.emitToRoom('gate_feed', 'TICKET_REDEEMED', {
       eventId,
       ...payload,
       timestamp: new Date().toISOString(),

@@ -111,6 +111,23 @@ export function initDatabase(): void {
 
   const schemaSql = fs.readFileSync(schemaPath, 'utf8');
   db.exec(schemaSql);
+
+  // Safe progressive schema migrations
+  try {
+    db.exec('ALTER TABLE bookings ADD COLUMN is_redeemed INTEGER NOT NULL DEFAULT 0;');
+  } catch {
+    // Column already exists
+  }
+  try {
+    db.exec('ALTER TABLE bookings ADD COLUMN redeemed_at DATETIME;');
+  } catch {
+    // Column already exists
+  }
+  try {
+    db.exec('ALTER TABLE bookings ADD COLUMN redeemed_by TEXT;');
+  } catch {
+    // Column already exists
+  }
 }
 
 /**
