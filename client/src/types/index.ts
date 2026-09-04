@@ -65,6 +65,7 @@ export interface Event {
   waitlist_held_seats?: number;
   confirmed_bookings_count?: number;
   confirmed_tickets_sold?: number;
+  confirmed_tickets_checked_in?: number;
   total_revenue?: number;
 }
 
