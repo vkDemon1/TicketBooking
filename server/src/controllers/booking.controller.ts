@@ -442,6 +442,7 @@ export class BookingController {
       const booking = db.prepare(`
         SELECT 
           b.id, b.booking_reference, b.total_amount, b.status, b.created_at, b.qr_signature,
+          b.is_redeemed, b.redeemed_at, b.redeemed_by,
           e.title as event_title, e.category as event_category, e.date_time,
           v.name as venue_name, v.city as venue_city, v.address as venue_address,
           u.name as attendee_name
@@ -473,6 +474,7 @@ export class BookingController {
       if (booking.status === 'CANCELLED') {
         res.status(200).json({
           status: 'CANCELLED',
+          isRedeemed: false,
           bookingReference: booking.booking_reference,
           message: 'This booking has been CANCELLED and is no longer valid for admission.',
           event: {
@@ -488,9 +490,15 @@ export class BookingController {
       }
 
       if (booking.status === 'CONFIRMED') {
+        const isRedeemed = Boolean(booking.is_redeemed);
         res.status(200).json({
-          status: 'VALID',
-          message: 'Ticket verified successfully. Valid for admission.',
+          status: isRedeemed ? 'REDEEMED' : 'VALID',
+          isRedeemed,
+          redeemedAt: booking.redeemed_at,
+          redeemedBy: booking.redeemed_by,
+          message: isRedeemed
+            ? `Ticket was already redeemed on ${new Date(booking.redeemed_at).toLocaleString()}${booking.redeemed_by ? ` by ${booking.redeemed_by}` : ''}.`
+            : 'Ticket verified successfully. Valid for admission.',
           bookingReference: booking.booking_reference,
           attendee: booking.attendee_name,
           totalAmount: booking.total_amount,
@@ -511,6 +519,211 @@ export class BookingController {
         status: 'INVALID',
         bookingReference,
         message: `Unknown ticket status: ${booking.status}`,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Gate Check-In & Anti-Fraud Ticket Redemption: POST /api/bookings/check-in
+   * Validates HMAC signature and atomically marks ticket as REDEEMED.
+   * Rejects already redeemed tickets with HTTP 409 Conflict.
+   */
+  static async checkInTicket(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      let { bookingReference, signature, gateStaffName, qrPayload } = req.body;
+
+      // If qrPayload is passed as JSON string
+      if (qrPayload && (!bookingReference || !signature)) {
+        try {
+          const parsed = typeof qrPayload === 'string' ? JSON.parse(qrPayload) : qrPayload;
+          if (parsed.bookingReference) bookingReference = parsed.bookingReference;
+          if (parsed.signature) signature = parsed.signature;
+        } catch {
+          // Continue with raw bookingReference
+        }
+      }
+
+      if (!bookingReference) {
+        throw new BadRequestError('bookingReference is required for gate check-in.');
+      }
+
+      // Cryptographic signature check (if signature provided)
+      if (signature) {
+        const isSignatureValid = QrService.verifySignature(bookingReference, signature);
+        if (!isSignatureValid) {
+          res.status(400).json({
+            success: false,
+            status: 'INVALID',
+            bookingReference,
+            message: 'Cryptographic signature mismatch! Ticket QR code is counterfeit or corrupted.',
+          });
+          return;
+        }
+      }
+
+      const staffIdentifier = gateStaffName || req.user?.name || (req.user ? `${req.user.email} (${req.user.role})` : 'Gate Terminal');
+
+      const checkInTxn = db.transaction((ref: string, staff: string) => {
+        const booking = db.prepare(`
+          SELECT 
+            b.id, b.booking_reference, b.event_id, b.total_amount, b.status, b.created_at, b.qr_signature,
+            b.is_redeemed, b.redeemed_at, b.redeemed_by,
+            e.title as event_title, e.category as event_category, e.date_time,
+            v.name as venue_name, v.city as venue_city, v.address as venue_address,
+            u.name as attendee_name, u.email as attendee_email
+          FROM bookings b
+          JOIN events e ON b.event_id = e.id
+          JOIN venues v ON e.venue_id = v.id
+          JOIN users u ON b.user_id = u.id
+          WHERE b.booking_reference = ?
+        `).get(ref) as any;
+
+        if (!booking) {
+          throw new NotFoundError('Booking reference not found in system records.');
+        }
+
+        if (booking.status === 'CANCELLED') {
+          throw new BadRequestError('This ticket was CANCELLED and refunded. Admission denied.');
+        }
+
+        if (booking.is_redeemed === 1) {
+          const errorObj: any = new ConflictError(
+            `Ticket already redeemed on ${new Date(booking.redeemed_at).toLocaleString()}${booking.redeemed_by ? ` by ${booking.redeemed_by}` : ''}. Duplicate admission denied.`
+          );
+          errorObj.code = 'ALREADY_REDEEMED';
+          errorObj.redeemedAt = booking.redeemed_at;
+          errorObj.redeemedBy = booking.redeemed_by;
+          errorObj.attendee = booking.attendee_name;
+          errorObj.eventTitle = booking.event_title;
+          throw errorObj;
+        }
+
+        const nowIso = new Date().toISOString();
+        const updateRes = db.prepare(`
+          UPDATE bookings
+          SET is_redeemed = 1, redeemed_at = ?, redeemed_by = ?
+          WHERE id = ? AND is_redeemed = 0 AND status = 'CONFIRMED'
+        `).run(nowIso, staff, booking.id);
+
+        if (Number(updateRes.changes) === 0) {
+          throw new ConflictError('Concurrent check-in detected. Ticket was just checked in by another gate terminal.');
+        }
+
+        const seats = db.prepare(`
+          SELECT s.row_label, s.seat_number, s.category, bs.price_paid
+          FROM booking_seats bs
+          JOIN seats s ON bs.seat_id = s.id
+          WHERE bs.booking_id = ?
+        `).all(booking.id) as any[];
+
+        const seatLabels = seats.map(s => `${s.row_label}${s.seat_number} (${s.category})`);
+
+        return {
+          booking,
+          seats: seatLabels,
+          seatCount: seats.length,
+          redeemedAt: nowIso,
+          redeemedBy: staff,
+        };
+      });
+
+      const result = checkInTxn.immediate(bookingReference.trim(), staffIdentifier);
+
+      // Broadcast gate activity
+      socketService.broadcastGateActivity(result.booking.event_id, {
+        bookingReference: result.booking.booking_reference,
+        attendee: result.booking.attendee_name,
+        seats: result.seats,
+        seatCount: result.seatCount,
+        redeemedAt: result.redeemedAt,
+        redeemedBy: result.redeemedBy,
+        eventTitle: result.booking.event_title,
+      });
+
+      res.status(200).json({
+        success: true,
+        status: 'CHECKED_IN',
+        message: 'Access Granted! Ticket redeemed successfully.',
+        bookingReference: result.booking.booking_reference,
+        attendee: result.booking.attendee_name,
+        email: result.booking.attendee_email,
+        redeemedAt: result.redeemedAt,
+        redeemedBy: result.redeemedBy,
+        event: {
+          id: result.booking.event_id,
+          title: result.booking.event_title,
+          category: result.booking.event_category,
+          dateTime: result.booking.date_time,
+          venue: `${result.booking.venue_name}, ${result.booking.venue_address}, ${result.booking.venue_city}`,
+        },
+        seats: result.seats,
+        seatCount: result.seatCount,
+      });
+    } catch (err: any) {
+      if (err?.code === 'ALREADY_REDEEMED') {
+        res.status(409).json({
+          success: false,
+          status: 'ALREADY_REDEEMED',
+          message: err.message,
+          redeemedAt: err.redeemedAt,
+          redeemedBy: err.redeemedBy,
+          attendee: err.attendee,
+          eventTitle: err.eventTitle,
+        });
+        return;
+      }
+      next(err);
+    }
+  }
+
+  /**
+   * Gate Attendance Statistics for an Event: GET /api/bookings/gate-stats/:eventId
+   */
+  static async getEventGateStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { eventId } = req.params;
+
+      const event = db.prepare('SELECT id, title, date_time FROM events WHERE id = ?').get(eventId) as any;
+      if (!event) {
+        throw new NotFoundError('Event not found.');
+      }
+
+      const confirmedBookings = db.prepare(`
+        SELECT 
+          b.id, b.booking_reference, b.is_redeemed, b.redeemed_at, b.redeemed_by,
+          u.name as attendee_name,
+          (SELECT COUNT(*) FROM booking_seats bs WHERE bs.booking_id = b.id) as seat_count
+        FROM bookings b
+        JOIN users u ON b.user_id = u.id
+        WHERE b.event_id = ? AND b.status = 'CONFIRMED'
+        ORDER BY b.redeemed_at DESC, b.created_at DESC
+      `).all(eventId) as any[];
+
+      const totalBookings = confirmedBookings.length;
+      const totalTicketsSold = confirmedBookings.reduce((sum, b) => sum + (b.seat_count || 0), 0);
+      const redeemedBookings = confirmedBookings.filter(b => b.is_redeemed === 1);
+      const totalCheckedIn = redeemedBookings.reduce((sum, b) => sum + (b.seat_count || 0), 0);
+      const checkInRate = totalTicketsSold > 0 ? (totalCheckedIn / totalTicketsSold) * 100 : 0;
+
+      const recentCheckIns = redeemedBookings.slice(0, 20).map(b => ({
+        bookingReference: b.booking_reference,
+        attendee: b.attendee_name,
+        seatCount: b.seat_count,
+        redeemedAt: b.redeemed_at,
+        redeemedBy: b.redeemed_by,
+      }));
+
+      res.json({
+        eventId,
+        eventTitle: event.title,
+        dateTime: event.date_time,
+        totalBookings,
+        totalTicketsSold,
+        totalCheckedIn,
+        checkInRate: parseFloat(checkInRate.toFixed(1)),
+        recentCheckIns,
       });
     } catch (err) {
       next(err);
