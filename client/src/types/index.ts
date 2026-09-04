@@ -94,6 +94,9 @@ export interface Booking {
   bookingReference: string;
   totalAmount: number;
   status: 'CONFIRMED' | 'CANCELLED';
+  isRedeemed?: boolean;
+  redeemedAt?: string;
+  redeemedBy?: string;
   createdAt: string;
   event: {
     id: string;
@@ -110,6 +113,47 @@ export interface Booking {
   seats: BookingSeat[];
   qrCode: string;
   signature: string;
+}
+
+export interface GateScanResult {
+  status: 'VALID' | 'CHECKED_IN' | 'ALREADY_REDEEMED' | 'CANCELLED' | 'INVALID';
+  success?: boolean;
+  isRedeemed?: boolean;
+  redeemedAt?: string;
+  redeemedBy?: string;
+  bookingReference?: string;
+  message: string;
+  attendee?: string;
+  email?: string;
+  totalAmount?: number;
+  createdAt?: string;
+  event?: {
+    id?: string;
+    title: string;
+    category?: EventCategory;
+    dateTime: string;
+    venue: string;
+  };
+  seats?: string[];
+  seatCount?: number;
+  signature?: string;
+}
+
+export interface EventGateStats {
+  eventId: string;
+  eventTitle: string;
+  dateTime: string;
+  totalBookings: number;
+  totalTicketsSold: number;
+  totalCheckedIn: number;
+  checkInRate: number;
+  recentCheckIns: Array<{
+    bookingReference: string;
+    attendee: string;
+    seatCount: number;
+    redeemedAt: string;
+    redeemedBy: string;
+  }>;
 }
 
 export interface WaitlistEntry {
@@ -166,3 +210,4 @@ export interface EmailLog {
   sentAt: string;
   data: any;
 }
+
