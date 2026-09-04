@@ -13,8 +13,10 @@ router.post('/checkout', requireAuth, BookingController.checkout);
 router.get('/my-bookings', requireAuth, BookingController.getMyBookings);
 router.post('/:id/cancel', requireAuth, BookingController.cancelBooking);
 
-// QR Ticket Verification
+// QR Ticket Verification & Gate Check-In
 router.post('/verify', BookingController.verifyTicket);
 router.get('/verify/:bookingReference', BookingController.getBookingByReference);
+router.post('/check-in', BookingController.checkInTicket);
+router.get('/gate-stats/:eventId', BookingController.getEventGateStats);
 
 export default router;

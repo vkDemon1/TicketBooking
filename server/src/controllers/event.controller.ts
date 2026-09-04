@@ -277,6 +277,12 @@ export class EventController {
             WHERE b.event_id = e.id AND b.status = 'CONFIRMED'
           ) as confirmed_tickets_sold,
           (
+            SELECT COUNT(bs.id)
+            FROM bookings b
+            JOIN booking_seats bs ON bs.booking_id = b.id
+            WHERE b.event_id = e.id AND b.status = 'CONFIRMED' AND b.is_redeemed = 1
+          ) as confirmed_tickets_checked_in,
+          (
             SELECT COALESCE(SUM(bs.price_paid), 0)
             FROM bookings b
             JOIN booking_seats bs ON bs.booking_id = b.id
@@ -293,15 +299,19 @@ export class EventController {
       // Aggregated summary totals
       const totalRevenue = events.reduce((sum, e) => sum + (e.total_revenue || 0), 0);
       const totalTicketsSold = events.reduce((sum, e) => sum + (e.confirmed_tickets_sold || 0), 0);
+      const totalCheckedIn = events.reduce((sum, e) => sum + (e.confirmed_tickets_checked_in || 0), 0);
       const totalCapacity = events.reduce((sum, e) => sum + (e.total_seats || 0), 0);
       const overallOccupancy = totalCapacity > 0 ? (totalTicketsSold / totalCapacity) * 100 : 0;
+      const overallCheckInRate = totalTicketsSold > 0 ? (totalCheckedIn / totalTicketsSold) * 100 : 0;
 
       res.json({
         summary: {
           totalRevenue,
           totalTicketsSold,
+          totalCheckedIn,
           totalCapacity,
           overallOccupancy: parseFloat(overallOccupancy.toFixed(1)),
+          overallCheckInRate: parseFloat(overallCheckInRate.toFixed(1)),
           eventsCount: events.length,
         },
         events,
