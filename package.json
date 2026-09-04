@@ -18,7 +18,8 @@
     "test:ttl": "cd server && npm run test:ttl",
     "test:waitlist": "cd server && npm run test:waitlist",
     "test:booking": "cd server && npm run test:booking",
-    "test:qr": "cd server && npm run test:qr"
+    "test:qr": "cd server && npm run test:qr",
+    "test:checkin": "cd server && npm run test:checkin"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
