@@ -94,6 +94,9 @@ CREATE TABLE IF NOT EXISTS bookings (
   status TEXT NOT NULL DEFAULT 'CONFIRMED' CHECK(status IN ('CONFIRMED', 'CANCELLED')),
   qr_payload TEXT NOT NULL,
   qr_signature TEXT NOT NULL,
+  is_redeemed INTEGER NOT NULL DEFAULT 0,
+  redeemed_at DATETIME,
+  redeemed_by TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
