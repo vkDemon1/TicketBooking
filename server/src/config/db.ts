@@ -109,25 +109,25 @@ export function initDatabase(): void {
     throw new Error(`Database schema not found at: ${schemaPath}`);
   }
 
-  const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-  db.exec(schemaSql);
-
-  // Safe progressive schema migrations
+  // Safe progressive schema migrations in case table was created previously without new columns
   try {
     db.exec('ALTER TABLE bookings ADD COLUMN is_redeemed INTEGER NOT NULL DEFAULT 0;');
   } catch {
-    // Column already exists
+    // Table may not exist yet or column already exists
   }
   try {
     db.exec('ALTER TABLE bookings ADD COLUMN redeemed_at DATETIME;');
   } catch {
-    // Column already exists
+    // Table may not exist yet or column already exists
   }
   try {
     db.exec('ALTER TABLE bookings ADD COLUMN redeemed_by TEXT;');
   } catch {
-    // Column already exists
+    // Table may not exist yet or column already exists
   }
+
+  const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+  db.exec(schemaSql);
 }
 
 /**
