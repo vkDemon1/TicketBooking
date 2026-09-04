@@ -14,7 +14,8 @@
     "test:ttl": "vitest run tests/ttl.test.ts",
     "test:waitlist": "vitest run tests/waitlist.test.ts",
     "test:booking": "vitest run tests/booking-concurrency.test.ts",
-    "test:qr": "vitest run tests/qr.test.ts"
+    "test:qr": "vitest run tests/qr.test.ts",
+    "test:checkin": "vitest run tests/gate-checkin.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
