@@ -82,10 +82,11 @@ Waitlist offers carry an exclusive 5-minute TTL (`WAITLIST_OFFER_TTL_SECONDS`).
 
 ---
 
-## 6. Security, Verification & Real-Time Sync
+## 6. Security, Gate Check-In & Real-Time Sync
 - **Cryptographic QR Code**: Encodes `{ "bookingReference": "BK-...", "signature": "..." }` generated using `HMAC-SHA256(bookingReference, QR_SECRET)`. No raw customer PII is stored in the QR payload.
-- **Verification Endpoint**: `GET /api/bookings/verify/:bookingReference` performs timing-safe signature comparison and database validation, returning `VALID`, `CANCELLED`, or `INVALID`.
-- **Real-Time WebSockets**: Socket.io rooms (`event:${eventId}`) broadcast invalidation events (`SEATS_HELD`, `SEATS_RELEASED`, `SEATS_BOOKED`). Connected clients refresh their visual grids instantly without polling.
+- **Verification & Gate Check-In**: `GET /api/bookings/verify/:bookingReference` performs timing-safe signature comparison and database validation, returning `VALID`, `REDEEMED`, `CANCELLED`, or `INVALID`.
+- **Atomic Gate Redemption (`POST /api/bookings/check-in`)**: Inside a `BEGIN IMMEDIATE` transaction, verifies `status == 'CONFIRMED'` and `is_redeemed == 0` before updating `is_redeemed = 1`, `redeemed_at = NOW()`, and `redeemed_by = [Gate Staff]`. Re-scanning an already redeemed ticket immediately returns `HTTP 409 Conflict` (`ALREADY_REDEEMED`) with the exact timestamp and station of prior admission to prevent duplicate entry fraud.
+- **Real-Time WebSockets**: Socket.io rooms (`event:${eventId}`) broadcast invalidation events (`SEATS_HELD`, `SEATS_RELEASED`, `SEATS_BOOKED`, `TICKET_REDEEMED`). Connected clients and gate terminals refresh their visual grids and attendance manifests instantly without polling.
 
 ---
 
