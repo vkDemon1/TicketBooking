@@ -29,7 +29,7 @@
 15. [TTL & Dual Auto-Release System](#15-ttl--dual-auto-release-system)
 16. [Concurrency Protection Mechanism](#16-concurrency-protection-mechanism)
 17. [Waitlist Auto-Assignment & Cascade](#17-waitlist-auto-assignment--cascade)
-18. [QR Code Ticketing & Cryptographic Security](#18-qr-code-ticketing--cryptographic-security)
+18. [QR Code Ticketing, Gate Check-In & Anti-Fraud](#18-qr-code-ticketing-gate-check-in--anti-fraud)
 19. [Email System & In-App Mail Sandbox](#19-email-system--in-app-mail-sandbox)
 20. [Real-Time WebSockets (Socket.io)](#20-real-time-websockets-socketio)
 21. [Automated Testing Suite](#21-automated-testing-suite)
@@ -40,11 +40,11 @@
 
 ## 1. Project Overview
 CineConcert is an end-to-end ticketing platform for movies and live concert tours. It solves the critical engineering challenges of high-demand ticketing:
-- **Zero Double-Booking**: Guarantees strict transactional serialization during simultaneous seat selection spikes.
+- **Zero Double-Booking**: Guarantees strict transactional serialization during simultaneous seat selection spikes (`BEGIN IMMEDIATE`).
 - **Seat Map Sync**: Real-time multi-tier seating grids (curved cinema screens and concert stages) synchronizing across all connected browsers.
 - **Abandoned Checkout Recovery**: Configurable 10-minute hold TTL with dual expiration (3-second background sweeper + inline lazy check on read).
 - **Automated Waitlist Cascade**: On booking cancellation, released seats are automatically assigned to waiting fans with a 5-minute magic claim link; if unclaimed, offers cascade down the queue.
-- **Counterfeit-Proof Tickets**: QR code boarding passes signed with HMAC-SHA256 and verifiable via a gate scanner endpoint.
+- **Gate Check-In & Anti-Fraud Redemption**: QR tickets signed with HMAC-SHA256, verified at the venue gate with atomic check-in redemption, duplicate entry detection (anti-replay), synthesized Web Audio feedback, and live organizer attendance manifests.
 
 ---
 
@@ -54,9 +54,10 @@ CineConcert is an end-to-end ticketing platform for movies and live concert tour
 - Create and manage venues with custom dimensions (Rows A-Z, 1-40 columns).
 - Interactive visual grid builder: Paint seat tiers (`VIP`, `PREMIUM`, `STANDARD`, `BALCONY`, `ACCESSIBLE`) and toggle active/disabled seats.
 
-### 🎪 Organizer Dashboard
+### 🎪 Organizer Dashboard & Live Gate Monitor
 - Create movies and concerts, assign venues, and configure per-category pricing.
 - Live box office analytics: Confirmed gross revenue (excluding cancellations), tickets sold, total capacity, and occupancy percentages.
+- **Real-Time Gate Attendance Tracking**: Live check-in progress bar per event, attendance rate KPIs, and live **Gate Manifest Inspector** displaying admitted attendees and check-in timestamps in real time.
 
 ### 🎟️ Customer Experience
 - Browse, search, and filter events by category (Movies / Concerts), city, and date.
@@ -64,10 +65,14 @@ CineConcert is an end-to-end ticketing platform for movies and live concert tour
 - Boarding-pass tickets with print/download support, booking cancellation, and built-in QR ticket scanner.
 - Category waitlist subscription for sold-out events with live queue position tracking.
 
-### 🛠️ Evaluator Sandbox Tools
+### 🛠️ Evaluator Sandbox & Gate Terminal Tools
 - **1-Click Demo Persona Switcher**: Instant switching between Admin, Organizer, Alice (customer with tickets), Bob (Waitlist #1), and Charlie (Waitlist #2).
 - **In-App Email Sandbox**: Inspect all delivered confirmation emails, tickets, QR codes, and click magic claim links directly.
-- **Venue Gate Scanner Tool**: Test ticket verification (`VALID`, `CANCELLED`, `INVALID`) and simulate counterfeit signatures.
+- **Staff Gate Terminal & Anti-Fraud Scanner**:
+  - Dual modes: **Scan & Check-In** (atomic redemption) vs **Verify Only**.
+  - Synthesized Web Audio API sound chimes (harmonic chime on admission, buzzer on double-scan alert).
+  - High-visibility badges: 🟢 *Access Granted*, 🟡 *Double Entry Alert (with previous check-in time & gate station)*, 🔴 *Entry Denied*.
+  - Live session scan history stream.
 
 ---
 
@@ -182,7 +187,9 @@ TicketBooking/
 │       ├── ttl.test.ts                   # 2s TTL auto-release & lazy expiry test
 │       ├── waitlist.test.ts              # Waitlist auto-assignment, expiry & cascade test
 │       ├── booking-concurrency.test.ts   # Duplicate checkout race test
-│       └── qr.test.ts                    # QR HMAC verification & cancellation test
+│       ├── qr.test.ts                    # QR HMAC verification & cancellation test
+│       ├── gate-checkin.test.ts          # Gate check-in, duplicate scan 409 & concurrency test
+│       └── sandbox-waitlist-magic.test.ts# E2E waitlist magic claim & scan flow test
 │
 └── client/                               # Frontend Single Page Application
     ├── package.json
