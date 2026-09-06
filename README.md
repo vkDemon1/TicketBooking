@@ -430,13 +430,19 @@ When 20 users simultaneously request the exact same seat:
 
 ---
 
-## 18. QR Code Ticketing & Cryptographic Security
-- QR codes encode `{ "bookingReference": "BK-...", "signature": "..." }` without exposing private customer PII.
-- The signature is calculated using `HMAC-SHA256(bookingReference, QR_SECRET)`.
-- Verification endpoint `GET /api/bookings/verify/:bookingReference` performs timing-safe comparison and checks booking status:
-  - `CONFIRMED` $\rightarrow$ `VALID` (Admission granted).
-  - `CANCELLED` $\rightarrow$ `CANCELLED` (Admission denied).
+## 18. QR Code Ticketing, Gate Check-In & Anti-Fraud
+- **Cryptographic Signing**: QR codes encode `{ "bookingReference": "BK-...", "signature": "..." }` without exposing private customer PII. Signatures are computed using `HMAC-SHA256(bookingReference, QR_SECRET)`.
+- **Atomic Gate Check-In (`POST /api/bookings/check-in`)**:
+  - Validates HMAC signature using timing-safe comparison.
+  - Inside a `BEGIN IMMEDIATE` transaction, verifies `status == 'CONFIRMED'` and `is_redeemed == 0`.
+  - Atomically marks `is_redeemed = 1`, `redeemed_at = NOW()`, and `redeemed_by = [Staff Name / Station]`.
+  - **Anti-Fraud Duplicate Prevention**: Attempting to scan or re-admit an already redeemed ticket immediately triggers an `HTTP 409 Conflict` (`ALREADY_REDEEMED`) with the exact timestamp and station name of the initial admission.
+- **Verification Endpoint (`GET /api/bookings/verify/:bookingReference`)**:
+  - `CONFIRMED` & Not Redeemed $\rightarrow$ `VALID` (Admission ready).
+  - `CONFIRMED` & Already Redeemed $\rightarrow$ `REDEEMED` (Already checked in).
+  - `CANCELLED` $\rightarrow$ `CANCELLED` (Refunded / Admission denied).
   - Forged / tampered signature $\rightarrow$ `INVALID`.
+- **Web Audio Feedback**: Integrated synthesized sound effects (high 2-tone melodic harmonic chime on entry, 2-tone alert buzz on duplicate scan).
 
 ---
 
@@ -450,8 +456,11 @@ When 20 users simultaneously request the exact same seat:
 
 ## 20. Real-Time WebSockets (Socket.io)
 - Clients join room `event:${eventId}` when viewing an event.
-- Broadcasts lightweight invalidation signals (`SEATS_HELD`, `SEATS_RELEASED`, `SEATS_BOOKED`, `WAITLIST_OFFER_CREATED`).
-- SQLite is the single source of truth; clients re-fetch fresh state from the REST API on reconnect.
+- Broadcasts lightweight real-time invalidation signals:
+  - `SEATS_HELD`, `SEATS_RELEASED`, `SEATS_BOOKED`
+  - `WAITLIST_OFFER_CREATED`, `WAITLIST_OFFER_EXPIRED`
+  - `TICKET_REDEEMED` (Gate activity update)
+- SQLite is the single source of truth; clients re-fetch fresh authoritative state from the REST API on reconnect.
 
 ---
 
@@ -462,23 +471,26 @@ Run all tests from the repository root:
 npm test
 ```
 
-Verified Test Results: **5 test files passed, 11/11 tests passed (100%)**.
+Verified Test Results: **7 test files passed, 21/21 tests passed (100%)**.
 
 ### Dedicated Test Commands:
 ```bash
-# 1. Concurrency Stress Test (20 simultaneous requests -> 1 HTTP 200, 19 HTTP 409)
+# 1. Gate Check-In & Anti-Fraud Test (Atomic check-in, duplicate 409 rejection & concurrency)
+npm run test:checkin
+
+# 2. Concurrency Stress Test (20 simultaneous requests -> 1 HTTP 200, 19 HTTP 409)
 npm run test:concurrency
 
-# 2. TTL Auto-Release & Lazy Expiry Test (2-second TTL deterministic test)
+# 3. TTL Auto-Release & Lazy Expiry Test (2-second TTL deterministic test)
 npm run test:ttl
 
-# 3. Waitlist Cascade & Expiry Test (Cancellation -> Offer -> Expiry -> Cascade -> Claim)
+# 4. Waitlist Cascade & Expiry Test (Cancellation -> Offer -> Expiry -> Cascade -> Claim)
 npm run test:waitlist
 
-# 4. Booking Concurrency Test (Simultaneous duplicate checkout protection)
+# 5. Booking Concurrency Test (Simultaneous duplicate checkout protection)
 npm run test:booking
 
-# 5. QR Cryptographic Verification Test (Valid, Forged, and Cancelled QR tickets)
+# 6. QR Cryptographic Verification Test (Valid, Forged, and Cancelled QR tickets)
 npm run test:qr
 ```
 
