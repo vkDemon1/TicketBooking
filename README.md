@@ -296,7 +296,7 @@ The database uses SQLite in WAL mode with foreign keys enabled. `event_seats` is
 5. `event_seat_pricing`: `(id, event_id, seat_category, price, UNIQUE(event_id, seat_category))`
 6. `event_seats`: `(id, event_id, seat_id, status [AVAILABLE, HELD, BOOKED, WAITLIST_HELD], current_hold_id, updated_at, UNIQUE(event_id, seat_id))`
 7. `seat_holds`: `(id, event_id, user_id, seat_ids_json, expires_at, status [ACTIVE, CONVERTED, EXPIRED, RELEASED], created_at)`
-8. `bookings`: `(id, booking_reference, event_id, user_id, total_amount, status [CONFIRMED, CANCELLED], qr_payload, qr_signature, created_at)`
+8. `bookings`: `(id, booking_reference, event_id, user_id, total_amount, status [CONFIRMED, CANCELLED], qr_payload, qr_signature, is_redeemed, redeemed_at, redeemed_by, created_at)`
 9. `booking_seats`: `(id, booking_id, seat_id, price_paid)`
 10. `waitlist_entries`: `(id, event_id, user_id, seat_category, seat_count, status [WAITING, OFFERED, CONVERTED, EXPIRED, CANCELLED], created_at)`
 11. `waitlist_offers`: `(id, waitlist_entry_id, event_id, user_id, seat_ids_json, claim_token, expires_at, status [PENDING, ACCEPTED, EXPIRED], created_at)`
@@ -309,6 +309,7 @@ The database uses SQLite in WAL mode with foreign keys enabled. `event_seats` is
 - `idx_waitlist_offers_pending_exp`: `waitlist_offers(status, expires_at)`
 - `idx_bookings_user`: `bookings(event_id, user_id)`
 - `idx_bookings_reference`: `bookings(booking_reference)`
+- `idx_bookings_redeemed`: `bookings(event_id, is_redeemed)`
 
 ---
 
@@ -331,7 +332,7 @@ All pre-seeded demo accounts use password: `password123`.
 | Persona | Role | Email | Scenario & Purpose |
 |---|---|---|---|
 | **Alex Vance** | `ADMIN` | `admin@cineconcert.io` | Manage venues, test layout designer & seat tiers |
-| **Apex Live** | `ORGANIZER` | `organizer@cineconcert.io` | View confirmed box office revenue, publish shows |
+| **Apex Live** | `ORGANIZER` | `organizer@cineconcert.io` | View confirmed box office revenue & live gate attendance |
 | **Alice Walker** | `CUSTOMER` | `alice@cineconcert.io` | Holds confirmed booking for *Interstellar VIP seats A1-A2* |
 | **Bob Martinez** | `CUSTOMER` | `bob@cineconcert.io` | #1 on Waitlist for Interstellar VIP (2 seats) |
 | **Charlie Davis** | `CUSTOMER` | `charlie@cineconcert.io` | #2 on Waitlist for Interstellar VIP (1 seat) |
@@ -357,15 +358,17 @@ All pre-seeded demo accounts use password: `password123`.
 - `GET /api/events/:id` — Event details and category pricing.
 - `GET /api/events/:id/seats` — Visual seat map (triggers read-optimized lazy expiration inline).
 - `POST /api/events` [ORGANIZER] — Create event and initialize `event_seats`.
-- `GET /api/events/organizer/my-events` [ORGANIZER] — Live revenue and occupancy analytics.
+- `GET /api/events/organizer/my-events` [ORGANIZER] — Live revenue, occupancy, and gate check-in analytics.
 
-### Holds & Booking (`/api/bookings`)
+### Holds, Bookings & Gate Check-In (`/api/bookings`)
 - `POST /api/bookings/hold` — Atomically place hold with configurable TTL (`{ eventId, seatIds, ttlSeconds }`).
 - `POST /api/bookings/release-hold` — Manually release hold on checkout abandonment (`{ holdId }`).
 - `POST /api/bookings/checkout` — Atomically convert active hold to confirmed booking (`{ holdId }`).
-- `GET /api/bookings/my-bookings` — Customer booking history with QR codes.
+- `GET /api/bookings/my-bookings` — Customer booking history with QR codes and redemption timestamps.
 - `POST /api/bookings/:id/cancel` — Cancel booking and trigger waitlist auto-assignment.
-- `GET /api/bookings/verify/:bookingReference` — **Canonical verification endpoint** (supports optional `?signature=...` query param).
+- `GET /api/bookings/verify/:bookingReference` — Validates HMAC signature & status (`VALID`, `REDEEMED`, `CANCELLED`, `INVALID`).
+- `POST /api/bookings/check-in` — **Gate Admission & Anti-Fraud Endpoint** (`{ bookingReference, signature?, gateStaffName?, qrPayload? }`). Atomically validates signature, redeems ticket, and rejects duplicate scans with `HTTP 409 Conflict`.
+- `GET /api/bookings/gate-stats/:eventId` — Returns event attendance summary, check-in percentage, and recent admission log.
 
 ### Waitlist (`/api/waitlist`)
 - `POST /api/waitlist/join` — Join category queue (`{ eventId, seatCategory, seatCount }`).
