@@ -39,7 +39,7 @@
 ---
 
 ## 1. Project Overview
-CineConcert is an end-to-end ticketing platform for movies and live concert tours. It solves the critical engineering challenges of high-demand ticketing:
+CineConcert is an end-to-end ticketing platform for movies and live concert tours. It solves the critical engineering challenges of high-demand ticketing-
 - **Zero Double-Booking**: Guarantees strict transactional serialization during simultaneous seat selection spikes (`BEGIN IMMEDIATE`).
 - **Seat Map Sync**: Real-time multi-tier seating grids (curved cinema screens and concert stages) synchronizing across all connected browsers.
 - **Abandoned Checkout Recovery**: Configurable 10-minute hold TTL with dual expiration (3-second background sweeper + inline lazy check on read).
