@@ -8,7 +8,6 @@ import { seed } from '../src/db/seed.js';
 describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
   let customerToken: string;
   let organizerToken: string;
-  let eventId: string;
 
   beforeAll(async () => {
     await seed();
@@ -24,17 +23,15 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
       .post('/api/auth/login')
       .send({ email: 'organizer@cineconcert.io', password: 'password123' });
     organizerToken = orgAuth.body.token;
-
-    const event = db.prepare('SELECT id FROM events LIMIT 1').get() as any;
-    eventId = event.id;
   });
 
   it('1. Organizer can create a percentage promo code with max cap', async () => {
+    const code = `SUMMER_${Date.now().toString(36).toUpperCase()}`;
     const res = await request(app)
       .post('/api/promos')
       .set('Authorization', `Bearer ${organizerToken}`)
       .send({
-        code: 'SUMMER20',
+        code,
         discountType: 'PERCENTAGE',
         discountValue: 20,
         minOrderAmount: 50,
@@ -43,35 +40,43 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.promo.code).toBe('SUMMER20');
+    expect(res.body.promo.code).toBe(code);
     expect(res.body.promo.discount_type).toBe('PERCENTAGE');
     expect(res.body.promo.discount_value).toBe(20);
     expect(res.body.promo.max_discount).toBe(30);
   });
 
   it('2. Organizer can create a flat discount promo code', async () => {
+    const code = `FLAT_${Date.now().toString(36).toUpperCase()}`;
     const res = await request(app)
       .post('/api/promos')
       .set('Authorization', `Bearer ${organizerToken}`)
       .send({
-        code: 'FLAT15',
+        code,
         discountType: 'FLAT',
         discountValue: 15,
         minOrderAmount: 30,
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.promo.code).toBe('FLAT15');
+    expect(res.body.promo.code).toBe(code);
     expect(res.body.promo.discount_type).toBe('FLAT');
     expect(res.body.promo.discount_value).toBe(15);
   });
 
   it('3. Validate endpoint correctly computes percentage discount with cap', async () => {
+    const code = `CAPTEST_${Date.now().toString(36).toUpperCase()}`;
+    db.prepare(`
+      INSERT INTO promo_codes (
+        id, code, discount_type, discount_value, min_order_amount, max_discount, is_active
+      ) VALUES (?, ?, 'PERCENTAGE', 20, 0, 30, 1)
+    `).run(uuidv4(), code);
+
     // 20% of $100 = $20 discount (under $30 cap)
     const res1 = await request(app)
       .post('/api/promos/validate')
       .send({
-        code: 'SUMMER20',
+        code,
         originalAmount: 100,
       });
 
@@ -84,7 +89,7 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
     const res2 = await request(app)
       .post('/api/promos/validate')
       .send({
-        code: 'SUMMER20',
+        code,
         originalAmount: 200,
       });
 
@@ -94,10 +99,17 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
   });
 
   it('4. Validate endpoint rejects order below minOrderAmount', async () => {
+    const code = `MINORDER_${Date.now().toString(36).toUpperCase()}`;
+    db.prepare(`
+      INSERT INTO promo_codes (
+        id, code, discount_type, discount_value, min_order_amount, is_active
+      ) VALUES (?, ?, 'PERCENTAGE', 20, 50, 1)
+    `).run(uuidv4(), code);
+
     const res = await request(app)
       .post('/api/promos/validate')
       .send({
-        code: 'SUMMER20',
+        code,
         originalAmount: 30, // Below minOrderAmount of $50
       });
 
@@ -106,18 +118,18 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
   });
 
   it('5. Validate endpoint rejects expired promo code', async () => {
-    // Insert expired promo
+    const code = `EXP_${Date.now().toString(36).toUpperCase()}`;
     db.prepare(`
       INSERT INTO promo_codes (
         id, code, discount_type, discount_value, min_order_amount,
         valid_until, is_active
-      ) VALUES (?, 'EXPIRED50', 'PERCENTAGE', 50, 0, datetime('now', '-1 day'), 1)
-    `).run(uuidv4());
+      ) VALUES (?, ?, 'PERCENTAGE', 50, 0, datetime('now', '-1 day'), 1)
+    `).run(uuidv4(), code);
 
     const res = await request(app)
       .post('/api/promos/validate')
       .send({
-        code: 'EXPIRED50',
+        code,
         originalAmount: 100,
       });
 
@@ -126,16 +138,17 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
   });
 
   it('6. Validate endpoint rejects deactivated promo code', async () => {
+    const code = `INACT_${Date.now().toString(36).toUpperCase()}`;
     db.prepare(`
       INSERT INTO promo_codes (
         id, code, discount_type, discount_value, is_active
-      ) VALUES (?, 'INACTIVE10', 'FLAT', 10, 0)
-    `).run(uuidv4());
+      ) VALUES (?, ?, 'FLAT', 10, 0)
+    `).run(uuidv4(), code);
 
     const res = await request(app)
       .post('/api/promos/validate')
       .send({
-        code: 'INACTIVE10',
+        code,
         originalAmount: 100,
       });
 
@@ -144,19 +157,17 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
   });
 
   it('7. Atomic Checkout successfully applies promo code and updates usage count', async () => {
-    // Get fresh event
     const currentEvent = db.prepare('SELECT id FROM events LIMIT 1').get() as any;
     const testEventId = currentEvent.id;
 
-    // Create a special promo code for checkout test
     const promoId = uuidv4();
+    const code = `CHK_${Date.now().toString(36).toUpperCase()}`;
     db.prepare(`
       INSERT INTO promo_codes (
         id, code, discount_type, discount_value, min_order_amount, max_uses, uses_count, is_active
-      ) VALUES (?, 'CHECKOUT25', 'PERCENTAGE', 25, 0, 10, 0, 1)
-    `).run(promoId);
+      ) VALUES (?, ?, 'PERCENTAGE', 25, 0, 10, 0, 1)
+    `).run(promoId, code);
 
-    // Find 2 available seats for this event
     const seats = db.prepare(`
       SELECT seat_id FROM event_seats WHERE event_id = ? AND status = 'AVAILABLE' LIMIT 2
     `).all(testEventId) as any[];
@@ -177,10 +188,10 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
     const checkoutRes = await request(app)
       .post('/api/bookings/checkout')
       .set('Authorization', `Bearer ${customerToken}`)
-      .send({ holdId, promoCode: 'CHECKOUT25' });
+      .send({ holdId, promoCode: code });
 
     expect(checkoutRes.status).toBe(201);
-    expect(checkoutRes.body.booking.appliedPromoCode).toBe('CHECKOUT25');
+    expect(checkoutRes.body.booking.appliedPromoCode).toBe(code);
     expect(checkoutRes.body.booking.originalAmount).toBeGreaterThan(0);
     expect(checkoutRes.body.booking.discountAmount).toBeGreaterThan(0);
     expect(checkoutRes.body.booking.totalAmount).toBe(
@@ -199,16 +210,16 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
   });
 
   it('8. Concurrency & Zero-Overuse Guarantee: Promo code with max_uses = 1 cannot be overused', async () => {
-    // Get fresh event
     const currentEvent = db.prepare('SELECT id FROM events LIMIT 1').get() as any;
     const testEventId = currentEvent.id;
 
     const singleUsePromoId = uuidv4();
+    const code = `EXCL_${Date.now().toString(36).toUpperCase()}`;
     db.prepare(`
       INSERT INTO promo_codes (
         id, code, discount_type, discount_value, max_uses, uses_count, is_active
-      ) VALUES (?, 'EXCLUSIVEONE', 'FLAT', 20, 1, 0, 1)
-    `).run(singleUsePromoId);
+      ) VALUES (?, ?, 'FLAT', 20, 1, 0, 1)
+    `).run(singleUsePromoId, code);
 
     // Get another customer (bob)
     const bobAuth = await request(app)
@@ -243,16 +254,16 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
     const firstCheckout = await request(app)
       .post('/api/bookings/checkout')
       .set('Authorization', `Bearer ${customerToken}`)
-      .send({ holdId: aliceHold.body.holdId, promoCode: 'EXCLUSIVEONE' });
+      .send({ holdId: aliceHold.body.holdId, promoCode: code });
 
     expect(firstCheckout.status).toBe(201);
-    expect(firstCheckout.body.booking.appliedPromoCode).toBe('EXCLUSIVEONE');
+    expect(firstCheckout.body.booking.appliedPromoCode).toBe(code);
 
     // Second checkout with the same promo code must fail
     const secondCheckout = await request(app)
       .post('/api/bookings/checkout')
       .set('Authorization', `Bearer ${bobToken}`)
-      .send({ holdId: bobHold.body.holdId, promoCode: 'EXCLUSIVEONE' });
+      .send({ holdId: bobHold.body.holdId, promoCode: code });
 
     expect(secondCheckout.status).toBe(400);
     expect(secondCheckout.body.error).toContain('usage limit');
