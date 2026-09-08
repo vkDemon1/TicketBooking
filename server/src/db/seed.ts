@@ -19,6 +19,7 @@ export async function seed(): Promise<void> {
     DELETE FROM waitlist_entries;
     DELETE FROM booking_seats;
     DELETE FROM bookings;
+    DELETE FROM promo_codes;
     DELETE FROM seat_holds;
     DELETE FROM event_seats;
     DELETE FROM event_seat_pricing;
