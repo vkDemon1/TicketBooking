@@ -157,7 +157,14 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
   });
 
   it('7. Atomic Checkout successfully applies promo code and updates usage count', async () => {
-    const currentEvent = db.prepare('SELECT id FROM events LIMIT 1').get() as any;
+    const currentEvent = db.prepare(`
+      SELECT e.id FROM events e
+      JOIN event_seats es ON es.event_id = e.id
+      WHERE es.status = 'AVAILABLE'
+      GROUP BY e.id
+      HAVING count(es.id) >= 5
+      LIMIT 1
+    `).get() as any;
     const testEventId = currentEvent.id;
 
     const promoId = uuidv4();
@@ -210,7 +217,14 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
   });
 
   it('8. Concurrency & Zero-Overuse Guarantee: Promo code with max_uses = 1 cannot be overused', async () => {
-    const currentEvent = db.prepare('SELECT id FROM events LIMIT 1').get() as any;
+    const currentEvent = db.prepare(`
+      SELECT e.id FROM events e
+      JOIN event_seats es ON es.event_id = e.id
+      WHERE es.status = 'AVAILABLE'
+      GROUP BY e.id
+      HAVING count(es.id) >= 5
+      LIMIT 1
+    `).get() as any;
     const testEventId = currentEvent.id;
 
     const singleUsePromoId = uuidv4();
