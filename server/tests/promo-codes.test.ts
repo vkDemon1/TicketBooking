@@ -144,6 +144,10 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
   });
 
   it('7. Atomic Checkout successfully applies promo code and updates usage count', async () => {
+    // Get fresh event
+    const currentEvent = db.prepare('SELECT id FROM events LIMIT 1').get() as any;
+    const testEventId = currentEvent.id;
+
     // Create a special promo code for checkout test
     const promoId = uuidv4();
     db.prepare(`
@@ -152,18 +156,19 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
       ) VALUES (?, 'CHECKOUT25', 'PERCENTAGE', 25, 0, 10, 0, 1)
     `).run(promoId);
 
-    // Find 2 available seats
+    // Find 2 available seats for this event
     const seats = db.prepare(`
       SELECT seat_id FROM event_seats WHERE event_id = ? AND status = 'AVAILABLE' LIMIT 2
-    `).all(eventId) as any[];
+    `).all(testEventId) as any[];
 
+    expect(seats.length).toBe(2);
     const seatIds = seats.map(s => s.seat_id);
 
     // Hold seats
     const holdRes = await request(app)
       .post('/api/bookings/hold')
       .set('Authorization', `Bearer ${customerToken}`)
-      .send({ eventId, seatIds });
+      .send({ eventId: testEventId, seatIds });
 
     expect(holdRes.status).toBe(201);
     const holdId = holdRes.body.holdId;
@@ -194,6 +199,10 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
   });
 
   it('8. Concurrency & Zero-Overuse Guarantee: Promo code with max_uses = 1 cannot be overused', async () => {
+    // Get fresh event
+    const currentEvent = db.prepare('SELECT id FROM events LIMIT 1').get() as any;
+    const testEventId = currentEvent.id;
+
     const singleUsePromoId = uuidv4();
     db.prepare(`
       INSERT INTO promo_codes (
@@ -210,19 +219,25 @@ describe('PROMO CODES & DISCOUNT ENGINE TEST SUITE (PHASE 2A)', () => {
     // Find available seats for alice and bob
     const availSeats = db.prepare(`
       SELECT seat_id FROM event_seats WHERE event_id = ? AND status = 'AVAILABLE' LIMIT 2
-    `).all(eventId) as any[];
+    `).all(testEventId) as any[];
+
+    expect(availSeats.length).toBeGreaterThanOrEqual(2);
 
     // Alice holds seat 1
     const aliceHold = await request(app)
       .post('/api/bookings/hold')
       .set('Authorization', `Bearer ${customerToken}`)
-      .send({ eventId, seatIds: [availSeats[0].seat_id] });
+      .send({ eventId: testEventId, seatIds: [availSeats[0].seat_id] });
+
+    expect(aliceHold.status).toBe(201);
 
     // Bob holds seat 2
     const bobHold = await request(app)
       .post('/api/bookings/hold')
       .set('Authorization', `Bearer ${bobToken}`)
-      .send({ eventId, seatIds: [availSeats[1].seat_id] });
+      .send({ eventId: testEventId, seatIds: [availSeats[1].seat_id] });
+
+    expect(bobHold.status).toBe(201);
 
     // First checkout uses the code
     const firstCheckout = await request(app)
