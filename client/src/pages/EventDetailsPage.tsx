@@ -22,12 +22,26 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCw,
+  Tag,
+  Sparkles,
+  X,
 } from 'lucide-react';
 
 interface EventDetailsPageProps {
   eventId: string;
   onBack: () => void;
   onViewBooking: (bookingId: string) => void;
+}
+
+interface AppliedPromo {
+  promoId: string;
+  code: string;
+  discountType: 'PERCENTAGE' | 'FLAT';
+  discountValue: number;
+  maxDiscount: number | null;
+  discountAmount: number;
+  originalAmount: number;
+  netAmount: number;
 }
 
 export const EventDetailsPage: React.FC<EventDetailsPageProps> = ({
@@ -50,6 +64,12 @@ export const EventDetailsPage: React.FC<EventDetailsPageProps> = ({
   const [isHolding, setIsHolding] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
+
+  // Promo Code State
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
 
   // Modals & Feedback
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -261,6 +281,44 @@ export const EventDetailsPage: React.FC<EventDetailsPageProps> = ({
     }
   };
 
+  // Promo Code Validation Handler
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) return;
+    setIsValidatingPromo(true);
+    setPromoError(null);
+
+    try {
+      const res = await fetch('/api/promos/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: promoInput.trim(),
+          eventId,
+          originalAmount: totalPrice,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Invalid promo code.');
+      }
+
+      setAppliedPromo(data);
+      setPromoError(null);
+    } catch (err: any) {
+      setPromoError(err.message || 'Failed to apply promo code.');
+      setAppliedPromo(null);
+    } finally {
+      setIsValidatingPromo(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoInput('');
+    setPromoError(null);
+  };
+
   // 3. Checkout Handler (Atomic POST /api/bookings/checkout)
   const handleCheckout = async () => {
     if (!activeHoldId) return;
@@ -276,7 +334,10 @@ export const EventDetailsPage: React.FC<EventDetailsPageProps> = ({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ holdId: activeHoldId }),
+        body: JSON.stringify({
+          holdId: activeHoldId,
+          promoCode: appliedPromo ? appliedPromo.code : undefined,
+        }),
       });
 
       const data = await res.json();
@@ -295,6 +356,8 @@ export const EventDetailsPage: React.FC<EventDetailsPageProps> = ({
       setActiveHoldId(null);
       setHoldExpiresAt(null);
       setSelectedSeatIds([]);
+      setAppliedPromo(null);
+      setPromoInput('');
       await loadEventData();
     } catch (err: any) {
       setAlertMessage({ type: 'error', text: err.message || 'Checkout failed.' });
