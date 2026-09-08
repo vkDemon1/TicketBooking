@@ -18,6 +18,7 @@ import venueRoutes from './routes/venue.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import bookingRoutes from './routes/booking.routes.js';
 import waitlistRoutes from './routes/waitlist.routes.js';
+import promoRoutes from './routes/promo.routes.js';
 import sandboxRoutes from './routes/sandbox.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -61,6 +62,7 @@ app.use('/api/venues', venueRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/waitlist', waitlistRoutes);
+app.use('/api/promos', promoRoutes);
 app.use('/api/sandbox', sandboxRoutes);
 
 // Static Client File Serving in Production
