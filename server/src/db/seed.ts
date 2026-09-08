@@ -303,8 +303,19 @@ export async function seed(): Promise<void> {
     VALUES (?, ?, ?, 'VIP', 1, 'WAITING')
   `).run(charlieWaitlistId, event3Id, charlieId);
 
+  // 9. Seed Demo Promo Codes
+  db.prepare(`
+    INSERT INTO promo_codes (
+      id, code, discount_type, discount_value, min_order_amount, max_discount, max_uses, uses_count, is_active
+    ) VALUES 
+      (?, 'WELCOME10', 'FLAT', 10.0, 30.0, NULL, 500, 12, 1),
+      (?, 'VIP20', 'PERCENTAGE', 20.0, 50.0, 50.0, 200, 35, 1),
+      (?, 'CINEMA50', 'PERCENTAGE', 50.0, 100.0, 40.0, 50, 50, 1)
+  `).run(uuidv4(), uuidv4(), uuidv4());
+
   logger.info('✓ Seeded Demo Booking for Alice (BK-...-ALICE on Interstellar A1-A2)');
   logger.info('✓ Seeded Demo Waitlist Entries: Bob (VIP - 2 seats), Charlie (VIP - 1 seat)');
+  logger.info('✓ Seeded Demo Promo Codes: WELCOME10 ($10 off), VIP20 (20% off), CINEMA50 (50% off)');
   logger.info('🎉 Seed completed successfully!');
 }
 
