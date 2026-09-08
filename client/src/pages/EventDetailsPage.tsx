@@ -419,8 +419,18 @@ export const EventDetailsPage: React.FC<EventDetailsPageProps> = ({
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: '0.9rem', color: '#e2e8f0' }}>
-              Booking Reference: <strong style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{confirmedBooking.bookingReference}</strong>
+            <div style={{ fontSize: '0.9rem', color: '#e2e8f0', display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+              <div>
+                Booking Reference: <strong style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{confirmedBooking.bookingReference}</strong>
+              </div>
+              <div>
+                Total Paid: <strong style={{ color: '#10b981' }}>${confirmedBooking.totalAmount.toFixed(2)}</strong>
+                {confirmedBooking.appliedPromoCode && (
+                  <span style={{ marginLeft: 8, fontSize: '0.8rem', color: '#a7f3d0' }}>
+                    (Promo <strong>{confirmedBooking.appliedPromoCode}</strong> applied: -${(confirmedBooking.discountAmount || 0).toFixed(2)})
+                  </span>
+                )}
+              </div>
             </div>
             <button
               onClick={() => onBack()}
@@ -609,17 +619,129 @@ export const EventDetailsPage: React.FC<EventDetailsPageProps> = ({
               </div>
             )}
 
-            {/* Total Price */}
+            {/* Promo Code Input & Applied Badge */}
+            {selectedSeats.length > 0 && (
+              <div style={{
+                background: '#131b2e',
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 20,
+                border: appliedPromo ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, marginBottom: 10 }}>
+                  <Tag size={14} color="#818cf8" />
+                  Promo / Coupon Code
+                </div>
+
+                {appliedPromo ? (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    border: '1px solid #10b981',
+                    borderRadius: 8,
+                    padding: '8px 12px',
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Sparkles size={14} color="#10b981" />
+                        <strong style={{ color: '#10b981', fontSize: '0.88rem' }}>{appliedPromo.code}</strong>
+                        <span style={{ background: '#10b981', color: '#0f172a', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4 }}>
+                          {appliedPromo.discountType === 'PERCENTAGE' ? `${appliedPromo.discountValue}% OFF` : `$${appliedPromo.discountValue} FLAT`}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#a7f3d0', marginTop: 3 }}>
+                        Saving ${appliedPromo.discountAmount.toFixed(2)} on this order
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleRemovePromo}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        padding: 4,
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                      title="Remove promo code"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="text"
+                        placeholder="e.g. WELCOME10, VIP20"
+                        value={promoInput}
+                        onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleApplyPromo(); }}
+                        style={{
+                          flex: 1,
+                          background: '#0b1120',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: 8,
+                          padding: '8px 12px',
+                          color: '#ffffff',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          outline: 'none',
+                        }}
+                      />
+                      <button
+                        onClick={handleApplyPromo}
+                        disabled={!promoInput.trim() || isValidatingPromo}
+                        className="btn btn-secondary btn-sm"
+                        style={{ padding: '0 14px', fontSize: '0.82rem' }}
+                      >
+                        {isValidatingPromo ? 'Checking...' : 'Apply'}
+                      </button>
+                    </div>
+                    {promoError && (
+                      <div style={{ color: '#f87171', fontSize: '0.75rem', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <AlertCircle size={12} />
+                        {promoError}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Total Price Breakdown */}
             <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
               padding: '14px 0',
               borderTop: '1px solid rgba(255, 255, 255, 0.1)',
               marginBottom: 20,
             }}>
-              <span style={{ color: '#94a3b8', fontSize: '0.95rem' }}>Total Amount</span>
-              <strong style={{ color: '#10b981', fontSize: '1.5rem' }}>${totalPrice.toFixed(2)}</strong>
+              {appliedPromo && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Original Subtotal</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.9rem', textDecoration: 'line-through' }}>
+                      ${totalPrice.toFixed(2)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ color: '#10b981', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Tag size={12} />
+                      Discount ({appliedPromo.code})
+                    </span>
+                    <span style={{ color: '#10b981', fontSize: '0.9rem', fontWeight: 600 }}>
+                      -${appliedPromo.discountAmount.toFixed(2)}
+                    </span>
+                  </div>
+                </>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#ffffff', fontSize: '0.95rem', fontWeight: 600 }}>Total Due</span>
+                <strong style={{ color: '#10b981', fontSize: '1.5rem' }}>${(appliedPromo ? appliedPromo.netAmount : totalPrice).toFixed(2)}</strong>
+              </div>
             </div>
 
             {/* Action Buttons: Hold / Checkout / Waitlist */}
