@@ -145,16 +145,16 @@ export class BookingController {
   }
 
   /**
-   * Atomically convert active hold to confirmed booking
+   * Atomically convert active hold to confirmed booking (with optional promo code)
    */
   static async checkout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) throw new ForbiddenError('Unauthorized.');
 
-      const { holdId } = req.body;
+      const { holdId, promoCode } = req.body;
       if (!holdId) throw new BadRequestError('holdId is required.');
 
-      const checkoutTxn = db.transaction((hId: string, uId: string) => {
+      const checkoutTxn = db.transaction((hId: string, uId: string, pCode?: string) => {
         const hold = db.prepare('SELECT * FROM seat_holds WHERE id = ?').get(hId) as any;
         if (!hold) throw new NotFoundError('Hold record not found.');
         if (hold.user_id !== uId) throw new ForbiddenError('Hold does not belong to authenticated user.');
@@ -185,17 +185,86 @@ export class BookingController {
           }
         }
 
-        const totalAmount = eventSeats.reduce((sum, s) => sum + (s.price || 0), 0);
+        const originalAmount = eventSeats.reduce((sum, s) => sum + (s.price || 0), 0);
+        let discountAmount = 0;
+        let promoCodeId: string | null = null;
+        let appliedPromoCode: string | null = null;
+
+        // Process Promo Code if provided
+        if (pCode && typeof pCode === 'string' && pCode.trim().length > 0) {
+          const cleanCode = pCode.trim().toUpperCase();
+          const promo = db.prepare(`
+            SELECT * FROM promo_codes WHERE code = ? COLLATE NOCASE
+          `).get(cleanCode) as any;
+
+          if (!promo) {
+            throw new BadRequestError(`Promo code '${cleanCode}' is invalid.`);
+          }
+          if (!promo.is_active) {
+            throw new BadRequestError(`Promo code '${cleanCode}' is currently inactive.`);
+          }
+
+          const now = Date.now();
+          if (promo.valid_from && new Date(promo.valid_from).getTime() > now) {
+            throw new BadRequestError(`Promo code '${cleanCode}' is not active yet.`);
+          }
+          if (promo.valid_until && new Date(promo.valid_until).getTime() < now) {
+            throw new BadRequestError(`Promo code '${cleanCode}' has expired.`);
+          }
+          if (promo.event_id && promo.event_id !== hold.event_id) {
+            throw new BadRequestError(`Promo code '${cleanCode}' is not applicable to this event.`);
+          }
+          if (originalAmount < promo.min_order_amount) {
+            throw new BadRequestError(
+              `Minimum order amount of $${promo.min_order_amount.toFixed(2)} required to use '${cleanCode}'.`
+            );
+          }
+          if (promo.max_uses !== null && promo.uses_count >= promo.max_uses) {
+            throw new BadRequestError(`Promo code '${cleanCode}' usage limit has been reached.`);
+          }
+
+          // Calculate discount
+          if (promo.discount_type === 'PERCENTAGE') {
+            discountAmount = (originalAmount * promo.discount_value) / 100;
+            if (promo.max_discount !== null && discountAmount > promo.max_discount) {
+              discountAmount = promo.max_discount;
+            }
+          } else if (promo.discount_type === 'FLAT') {
+            discountAmount = Math.min(originalAmount, promo.discount_value);
+          }
+
+          discountAmount = Math.round(discountAmount * 100) / 100;
+          promoCodeId = promo.id;
+          appliedPromoCode = promo.code;
+
+          // Increment uses_count atomically inside transaction
+          db.prepare('UPDATE promo_codes SET uses_count = uses_count + 1 WHERE id = ?').run(promo.id);
+        }
+
+        const totalAmount = Math.max(0, Math.round((originalAmount - discountAmount) * 100) / 100);
         const bookingId = uuidv4();
         const bookingRef = `BK-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
         const qrSignature = QrService.generateSignature(bookingRef);
         const qrPayload = JSON.stringify({ bookingReference: bookingRef, signature: qrSignature });
 
-        // Insert booking
+        // Insert booking with promo auditing
         db.prepare(`
-          INSERT INTO bookings (id, booking_reference, event_id, user_id, total_amount, status, qr_payload, qr_signature)
-          VALUES (?, ?, ?, ?, ?, 'CONFIRMED', ?, ?)
-        `).run(bookingId, bookingRef, hold.event_id, uId, totalAmount, qrPayload, qrSignature);
+          INSERT INTO bookings (
+            id, booking_reference, event_id, user_id, total_amount, original_amount,
+            discount_amount, promo_code_id, status, qr_payload, qr_signature
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMED', ?, ?)
+        `).run(
+          bookingId,
+          bookingRef,
+          hold.event_id,
+          uId,
+          totalAmount,
+          originalAmount,
+          discountAmount,
+          promoCodeId,
+          qrPayload,
+          qrSignature
+        );
 
         // Insert booking_seats
         const insertBookingSeat = db.prepare(`
@@ -221,13 +290,16 @@ export class BookingController {
           bookingReference: bookingRef,
           qrSignature,
           totalAmount,
+          originalAmount,
+          discountAmount,
+          appliedPromoCode,
           eventId: hold.event_id,
           seatIds,
           seats: eventSeats.map(s => `${s.row_label}${s.seat_number}`),
         };
       });
 
-      const result = checkoutTxn.immediate(holdId, req.user.userId);
+      const result = checkoutTxn.immediate(holdId, req.user.userId, promoCode);
 
       // Post-commit notifications
       socketService.broadcastSeatUpdate(result.eventId, 'SEATS_BOOKED', { seatIds: result.seatIds });
@@ -244,6 +316,9 @@ export class BookingController {
           id: result.bookingId,
           bookingReference: result.bookingReference,
           totalAmount: result.totalAmount,
+          originalAmount: result.originalAmount,
+          discountAmount: result.discountAmount,
+          appliedPromoCode: result.appliedPromoCode,
           seats: result.seats,
           qrCode: qrDataUrl,
         },
@@ -262,12 +337,14 @@ export class BookingController {
 
       const bookings = db.prepare(`
         SELECT 
-          b.id, b.booking_reference, b.total_amount, b.status, b.created_at, b.qr_payload, b.qr_signature,
+          b.id, b.booking_reference, b.total_amount, b.original_amount, b.discount_amount,
+          b.promo_code_id, p.code as promo_code, b.status, b.created_at, b.qr_payload, b.qr_signature,
           e.id as event_id, e.title as event_title, e.category as event_category, e.date_time, e.banner_url,
           v.name as venue_name, v.city as venue_city, v.address as venue_address
         FROM bookings b
         JOIN events e ON b.event_id = e.id
         JOIN venues v ON e.venue_id = v.id
+        LEFT JOIN promo_codes p ON b.promo_code_id = p.id
         WHERE b.user_id = ?
         ORDER BY b.created_at DESC
       `).all(req.user.userId) as any[];
@@ -290,6 +367,9 @@ export class BookingController {
             id: b.id,
             bookingReference: b.booking_reference,
             totalAmount: b.total_amount,
+            originalAmount: b.original_amount ?? b.total_amount,
+            discountAmount: b.discount_amount ?? 0,
+            promoCode: b.promo_code ?? null,
             status: b.status,
             createdAt: b.created_at,
             event: {
