@@ -94,6 +94,10 @@ export interface Booking {
   id: string;
   bookingReference: string;
   totalAmount: number;
+  originalAmount?: number;
+  discountAmount?: number;
+  appliedPromoCode?: string | null;
+  promoCode?: string | null;
   status: 'CONFIRMED' | 'CANCELLED';
   isRedeemed?: boolean;
   redeemedAt?: string;
@@ -114,6 +118,23 @@ export interface Booking {
   seats: BookingSeat[];
   qrCode: string;
   signature: string;
+}
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  discount_type: 'PERCENTAGE' | 'FLAT';
+  discount_value: number;
+  min_order_amount: number;
+  max_discount?: number | null;
+  max_uses?: number | null;
+  uses_count: number;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  event_id?: string | null;
+  event_title?: string | null;
+  is_active: number | boolean;
+  created_at?: string;
 }
 
 export interface GateScanResult {
