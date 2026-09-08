@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { Event, Venue, SeatCategory, EventGateStats } from '../types';
+import { PromoCodeManager } from '../components/organizer/PromoCodeManager';
 import {
   Sparkles,
   DollarSign,
@@ -413,6 +414,9 @@ export const OrganizerDashboardPage: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Promo Code Management Section */}
+      <PromoCodeManager events={events} />
 
       {/* Gate Manifest & Attendee Audit Modal */}
       {selectedGateEvent && (
