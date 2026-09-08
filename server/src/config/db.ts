@@ -125,6 +125,21 @@ export function initDatabase(): void {
   } catch {
     // Table may not exist yet or column already exists
   }
+  try {
+    db.exec('ALTER TABLE bookings ADD COLUMN original_amount REAL;');
+  } catch {
+    // Table may not exist yet or column already exists
+  }
+  try {
+    db.exec('ALTER TABLE bookings ADD COLUMN discount_amount REAL DEFAULT 0;');
+  } catch {
+    // Table may not exist yet or column already exists
+  }
+  try {
+    db.exec('ALTER TABLE bookings ADD COLUMN promo_code_id TEXT REFERENCES promo_codes(id);');
+  } catch {
+    // Table may not exist yet or column already exists
+  }
 
   const schemaSql = fs.readFileSync(schemaPath, 'utf8');
   db.exec(schemaSql);

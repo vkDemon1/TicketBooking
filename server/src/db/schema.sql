@@ -84,13 +84,33 @@ CREATE TABLE IF NOT EXISTS seat_holds (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 8. Bookings
+-- 8. Promo Codes
+CREATE TABLE IF NOT EXISTS promo_codes (
+  id TEXT PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL COLLATE NOCASE,
+  discount_type TEXT NOT NULL CHECK(discount_type IN ('PERCENTAGE', 'FLAT')),
+  discount_value REAL NOT NULL,
+  min_order_amount REAL NOT NULL DEFAULT 0,
+  max_discount REAL,
+  max_uses INTEGER,
+  uses_count INTEGER NOT NULL DEFAULT 0,
+  valid_from DATETIME DEFAULT CURRENT_TIMESTAMP,
+  valid_until DATETIME,
+  event_id TEXT REFERENCES events(id) ON DELETE CASCADE,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 9. Bookings
 CREATE TABLE IF NOT EXISTS bookings (
   id TEXT PRIMARY KEY,
   booking_reference TEXT UNIQUE NOT NULL,
   event_id TEXT NOT NULL REFERENCES events(id),
   user_id TEXT NOT NULL REFERENCES users(id),
   total_amount REAL NOT NULL,
+  original_amount REAL,
+  discount_amount REAL DEFAULT 0,
+  promo_code_id TEXT REFERENCES promo_codes(id),
   status TEXT NOT NULL DEFAULT 'CONFIRMED' CHECK(status IN ('CONFIRMED', 'CANCELLED')),
   qr_payload TEXT NOT NULL,
   qr_signature TEXT NOT NULL,
@@ -100,7 +120,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 9. Booking Seats
+-- 10. Booking Seats
 CREATE TABLE IF NOT EXISTS booking_seats (
   id TEXT PRIMARY KEY,
   booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -108,7 +128,7 @@ CREATE TABLE IF NOT EXISTS booking_seats (
   price_paid REAL NOT NULL
 );
 
--- 10. Waitlist Entries
+-- 11. Waitlist Entries
 CREATE TABLE IF NOT EXISTS waitlist_entries (
   id TEXT PRIMARY KEY,
   event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -119,7 +139,7 @@ CREATE TABLE IF NOT EXISTS waitlist_entries (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 11. Waitlist Offers
+-- 12. Waitlist Offers
 CREATE TABLE IF NOT EXISTS waitlist_offers (
   id TEXT PRIMARY KEY,
   waitlist_entry_id TEXT NOT NULL REFERENCES waitlist_entries(id) ON DELETE CASCADE,
@@ -132,7 +152,7 @@ CREATE TABLE IF NOT EXISTS waitlist_offers (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 12. Email Logs
+-- 13. Email Logs
 CREATE TABLE IF NOT EXISTS email_logs (
   id TEXT PRIMARY KEY,
   to_email TEXT NOT NULL,
@@ -152,3 +172,5 @@ CREATE INDEX IF NOT EXISTS idx_waitlist_offers_active ON waitlist_offers(status,
 CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(event_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_ref ON bookings(booking_reference);
 CREATE INDEX IF NOT EXISTS idx_bookings_redeemed ON bookings(event_id, is_redeemed);
+CREATE INDEX IF NOT EXISTS idx_promo_codes_lookup ON promo_codes(code, is_active);
+CREATE INDEX IF NOT EXISTS idx_promo_codes_event ON promo_codes(event_id);
